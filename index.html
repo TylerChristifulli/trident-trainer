@@ -12,8 +12,11 @@
     --green:#4caf7d; --red:#e05d5d;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
-  body{background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; min-height:100vh;}
-  header{padding:20px 16px 12px; text-align:center; border-bottom:1px solid var(--border); background:linear-gradient(180deg,#101820,#0b0f14);}
+  body{background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; min-height:100vh; overscroll-behavior-y:contain;}
+  header{padding:20px 16px 12px; text-align:center; border-bottom:1px solid var(--border); background:linear-gradient(180deg,#101820,#0b0f14); position:relative;}
+  #refreshBtn{position:absolute; top:14px; right:14px; width:38px; height:38px; border-radius:50%; background:var(--panel2); border:1px solid var(--border); color:var(--accent); font-size:19px; cursor:pointer; line-height:1;}
+  #refreshBtn:active{transform:rotate(180deg);}
+  #ptr{position:fixed; top:-52px; left:0; right:0; z-index:100; text-align:center; padding:14px; background:var(--panel); color:var(--accent); font-size:14px; letter-spacing:1px; border-bottom:1px solid var(--accent); transition:top .2s;}
   header h1{font-size:22px; letter-spacing:4px; text-transform:uppercase; color:var(--accent);}
   header .sub{color:var(--muted); font-size:12px; letter-spacing:2px; margin-top:4px; text-transform:uppercase;}
   .weekbadge{display:inline-block; margin-top:10px; padding:4px 14px; border:1px solid var(--accent); border-radius:20px; font-size:13px; color:var(--accent); letter-spacing:1px;}
@@ -96,7 +99,9 @@
 </head>
 <body>
 
+<div id="ptr">Pull to refresh &darr;</div>
 <header>
+  <button id="refreshBtn" onclick="hardRefresh()" title="Refresh app &amp; data">&#10227;</button>
   <h1>Trident Trainer</h1>
   <div class="sub">Navy SEAL Prep &middot; Stairs + Strength</div>
   <div class="weekbadge" id="weekBadge">Week 1 of 12</div>
@@ -1063,6 +1068,39 @@ function importData(ev){
   };
   r.readAsText(f);
 }
+
+/* ---------- refresh: button + pull-to-refresh ---------- */
+function hardRefresh(){
+  var el = document.getElementById('ptr');
+  el.style.top = '0px'; el.textContent = 'Refreshing…';
+  location.replace(location.pathname + '?_=' + Date.now());
+}
+// clean the cache-bust param so the URL stays tidy
+if (location.search.indexOf('_=') !== -1){
+  try{ history.replaceState(null, '', location.pathname); }catch(e){}
+}
+var ptrStartY = null, ptrPull = 0;
+document.addEventListener('touchstart', function(e){
+  ptrStartY = (document.scrollingElement.scrollTop||0) === 0 ? e.touches[0].clientY : null;
+  ptrPull = 0;
+}, {passive:true});
+document.addEventListener('touchmove', function(e){
+  if (ptrStartY === null) return;
+  ptrPull = e.touches[0].clientY - ptrStartY;
+  var el = document.getElementById('ptr');
+  if (ptrPull > 30 && (document.scrollingElement.scrollTop||0) === 0){
+    el.style.top = '0px';
+    el.textContent = ptrPull > 90 ? 'Release to refresh ↻' : 'Pull to refresh ↓';
+  } else {
+    el.style.top = '-52px';
+  }
+}, {passive:true});
+document.addEventListener('touchend', function(){
+  var el = document.getElementById('ptr');
+  if (ptrStartY !== null && ptrPull > 90){ hardRefresh(); }
+  else { el.style.top = '-52px'; }
+  ptrStartY = null; ptrPull = 0;
+});
 
 /* ---------- init ---------- */
 document.getElementById('logDate').value = todayStr();
