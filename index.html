@@ -630,14 +630,34 @@ function isStairsDay(d){ return d.charAt(0)==='s'; }
 var currentDay = 'd1';
 
 /* ---------- workout view ---------- */
-document.querySelectorAll('#dayPick button').forEach(function(b){
-  b.addEventListener('click', function(){
-    document.querySelectorAll('#dayPick button').forEach(function(x){x.classList.remove('active');});
-    b.classList.add('active');
-    currentDay = b.dataset.day;
-    renderWorkout();
+function selectDay(d){
+  currentDay = d;
+  document.querySelectorAll('#dayPick button').forEach(function(x){
+    x.classList.toggle('active', x.dataset.day===d);
   });
+  renderWorkout();
+}
+document.querySelectorAll('#dayPick button').forEach(function(b){
+  b.addEventListener('click', function(){ selectDay(b.dataset.day); });
 });
+
+/* Next day in the split you haven't done this week.
+   Resumes an unfinished strength session from today first. */
+function nextWorkoutDay(){
+  var order = ['d1','s1','d3','s2'];
+  var today = todayStr();
+  for (var i=state.logs.length-1; i>=0; i--){
+    var l = state.logs[i];
+    if (l.date===today && l.type==='strength' && !l.feedback && l.day) return l.day;
+  }
+  var wl = logsInWeek(currentWeek());
+  for (var j=0; j<order.length; j++){
+    var d = order[j];
+    var done = wl.some(function(l){ return l.day===d; });
+    if (!done) return d;
+  }
+  return 'd1';
+}
 
 function exCard(name, muscle, r){
   var rows = '';
@@ -846,7 +866,7 @@ function finishWorkout(){
   persist();
   sbSaveLog(draft);
   alert('Workout saved. Hooyah!');
-  renderWorkout();
+  selectDay(nextWorkoutDay());
   renderPlan();
 }
 
@@ -1027,7 +1047,7 @@ async function initSupabase(){
     }
     persist();
     sbStatus('Connected — '+state.logs.length+' workouts in the cloud.', true);
-    viewWeek = null; renderPlan(); renderWorkout(); updateBwCard();
+    viewWeek = null; renderPlan(); selectDay(nextWorkoutDay()); updateBwCard();
   }catch(e){
     sbClient = null;
     sbStatus('Connection failed: '+(e.message||e)+' — running on local storage.', false);
@@ -1115,7 +1135,7 @@ if (sbCfg){
   document.getElementById('sbKey').value = sbCfg.key;
   initSupabase();
 }
-renderWorkout();
+selectDay(nextWorkoutDay());
 renderPlan();
 updateBwCard();
 </script>
