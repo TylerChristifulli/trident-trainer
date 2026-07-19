@@ -127,6 +127,16 @@
   </div>
 
   <div class="card">
+    <h2>Body Weight — Weekly Check-in</h2>
+    <div class="row">
+      <div><label>Current Weight (lb)</label><input type="number" id="bwInput" placeholder="e.g. 185"></div>
+      <div style="flex:0 0 auto; display:flex; align-items:flex-end;"><button class="btn small secondary" onclick="saveBw()">Log Weight</button></div>
+    </div>
+    <p class="note" id="bwStatus"></p>
+    <p class="note">Your logged weight auto-fills the weight field on bodyweight exercises (pull-ups, push-ups, dips, core work) so your training volume is tracked accurately.</p>
+  </div>
+
+  <div class="card">
     <h2>Cloud Sync — Supabase</h2>
     <label>Project URL</label>
     <input id="sbUrl" placeholder="https://yourproject.supabase.co">
@@ -202,6 +212,10 @@
     <canvas id="chartVolume" height="200"></canvas>
   </div>
   <div class="card">
+    <h2>Body Weight Over Time</h2>
+    <canvas id="chartBw" height="200"></canvas>
+  </div>
+  <div class="card">
     <h2>Data</h2>
     <div class="row">
       <div><button class="btn small secondary" style="width:100%" onclick="exportData()">Export JSON</button></div>
@@ -232,6 +246,7 @@ try {
   var saved = localStorage.getItem('tridentTrainer');
   if (saved) state = JSON.parse(saved);
 } catch(e){ storageOK = false; }
+if (!state.bw) state.bw = [];
 
 function persist(){
   if (storageOK){ try{ localStorage.setItem('tridentTrainer', JSON.stringify(state)); }catch(e){} }
@@ -406,15 +421,17 @@ function roundTo5(x){ return Math.max(5, Math.round(x/5)*5); }
 function getRecommendation(exName){
   var cw = currentWeek();
   var lp = lastPerformance(exName);
+  var bw = isBW(exName) ? currentBodyweight() : 0;
   if (isDeloadWeek(cw)){
-    if (!lp) return {sets:2, reps:'', weight:'', note:'Deload week — 2 easy sets, 4+ RIR.'};
+    if (!lp) return {sets:2, reps:'', weight: bw||'', note:'Deload week — 2 easy sets, 4+ RIR.'};
     var e = lp.perf.entry;
     return {sets: Math.max(2, Math.round(e.sets/2)),
             reps: e.reps,
-            weight: e.weight ? roundTo5(e.weight*0.6) : 0,
-            note: 'Deload — half the sets at ~60% load. Recover.'};
+            weight: isBW(exName) ? (bw||e.weight) : (e.weight ? roundTo5(e.weight*0.6) : 0),
+            note: 'Deload — half the sets'+(isBW(exName)?'':' at ~60% load')+'. Recover.'};
   }
-  if (!lp) return {sets:3, reps:'', weight:'', note:'First time — pick a load/reps you finish at '+rirLabel(cw)+'.'};
+  if (!lp) return {sets:3, reps:'', weight: bw||'',
+    note:(isBW(exName)&&bw?'Bodyweight ('+bw+' lb). ':'')+'First time — pick a load/reps you finish at '+rirLabel(cw)+'.'};
   var e = lp.perf.entry;
   var sets = e.sets, reps = e.reps, weight = e.weight||0, note;
   // Set progression: only accumulate within the same meso; new meso resets to 3.
@@ -424,14 +441,18 @@ function getRecommendation(exName){
     sets = 3;
   }
   // Load/rep progression
-  if (weight>0){
+  if (isBW(exName)){
+    reps = reps+2;
+    weight = bw || weight;
+    note='Last: '+e.reps+' reps/set. Bodyweight'+(bw?' ('+bw+' lb)':'')+' — add 2 reps per set.';
+  } else if (weight>0){
     if (reps>=10){ weight = roundTo5(weight*1.05); reps = Math.max(6, reps-3);
       note='Hit top of rep range last time ('+e.weight+'×'+e.reps+') — add load, drop reps.'; }
     else { reps = reps+1;
       note='Last: '+e.weight+' lb × '+e.reps+'. Same weight, +1 rep per set.'; }
   } else {
     reps = reps+2;
-    note='Last: '+e.reps+' reps/set. Bodyweight — add 2 reps per set.';
+    note='Last: '+e.reps+' reps/set. Add 2 reps per set.';
   }
   note += ' Train to '+rirLabel(cw)+'.';
   return {sets:sets, reps:reps, weight:weight, note:note};
@@ -481,6 +502,54 @@ var EX_INFO = {
 function exDemoLink(name){
   var q = name.replace(/\s*\(.*\)/,'') + ' proper form';
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+}
+
+/* ---------- body weight tracking ---------- */
+var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups'];
+function isBW(name){ return BW_EX.indexOf(name) !== -1; }
+function currentBodyweight(){
+  if (!state.bw.length) return 0;
+  return state.bw[state.bw.length-1].lb;
+}
+function daysSinceBw(){
+  if (!state.bw.length) return null;
+  var last = new Date(state.bw[state.bw.length-1].date+'T00:00:00');
+  return Math.floor((new Date()-last)/(24*3600*1000));
+}
+function saveBw(){
+  var lb = parseInt(document.getElementById('bwInput').value)||0;
+  if (!lb){ alert('Enter your weight in pounds.'); return; }
+  var today = todayStr();
+  state.bw = state.bw.filter(function(x){ return x.date !== today; });
+  state.bw.push({date: today, lb: lb});
+  state.bw.sort(function(a,b){ return a.date<b.date?-1:1; });
+  persist(); sbSaveBw(); updateBwCard();
+  alert('Body weight logged: '+lb+' lb');
+}
+function updateBwCard(){
+  var el = document.getElementById('bwStatus');
+  if (!el) return;
+  if (!state.bw.length){
+    el.textContent = 'No weight logged yet. Log it weekly — it auto-fills your bodyweight exercises.';
+    el.style.color = 'var(--muted)';
+    return;
+  }
+  var last = state.bw[state.bw.length-1];
+  var d = daysSinceBw();
+  document.getElementById('bwInput').value = last.lb;
+  if (d >= 7){
+    el.textContent = 'Last logged '+last.lb+' lb on '+last.date+' — '+d+' days ago. Time for your weekly weigh-in!';
+    el.style.color = 'var(--accent)';
+  } else {
+    el.textContent = 'Current: '+last.lb+' lb (logged '+last.date+'). Next weigh-in in '+(7-d)+' day'+(7-d===1?'':'s')+'.';
+    el.style.color = 'var(--green)';
+  }
+}
+function sbSaveBw(){
+  if (!sbClient) return;
+  sbClient.from('settings').upsert({key:'bodyweight', value:{list:state.bw}}).then(function(r){
+    if (r.error) sbStatus('Sync error: '+r.error.message, false);
+  });
 }
 function isStairsDay(d){ return d.charAt(0)==='s'; }
 var currentDay = 'd1';
@@ -678,6 +747,10 @@ function renderProgress(){
   }
   drawBars('chartVolume', vols, labels);
 
+  drawLine('chartBw',
+    state.bw.map(function(x){return x.lb;}),
+    state.bw.map(function(x){return x.date.slice(5);}));
+
   document.getElementById('storageNote').textContent = storageOK
     ? 'Data is saved automatically in this browser. Export a backup periodically.'
     : 'Warning: browser storage unavailable — data lives only until you close the page. Use Export to save your log.';
@@ -791,9 +864,15 @@ async function initSupabase(){
     var s = await sbClient.from('settings').select('*').eq('key','startDate').maybeSingle();
     if (s.data && s.data.value && s.data.value.v){ state.startDate = s.data.value.v; }
     else { await sbClient.from('settings').upsert({key:'startDate', value:{v:state.startDate}}); }
+    var b = await sbClient.from('settings').select('*').eq('key','bodyweight').maybeSingle();
+    if (b.data && b.data.value && b.data.value.list && b.data.value.list.length >= state.bw.length){
+      state.bw = b.data.value.list;
+    } else if (state.bw.length){
+      await sbClient.from('settings').upsert({key:'bodyweight', value:{list:state.bw}});
+    }
     persist();
     sbStatus('Connected — '+state.logs.length+' workouts in the cloud.', true);
-    viewWeek = null; renderPlan(); renderWorkout();
+    viewWeek = null; renderPlan(); renderWorkout(); updateBwCard();
   }catch(e){
     sbClient = null;
     sbStatus('Connection failed: '+(e.message||e)+' — running on local storage.', false);
@@ -844,6 +923,7 @@ if (sbCfg){
 }
 renderWorkout();
 renderPlan();
+updateBwCard();
 </script>
 </body>
 </html>
