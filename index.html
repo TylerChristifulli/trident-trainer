@@ -146,11 +146,10 @@
       <input type="date" id="logDate" style="width:auto">
     </div>
     <div class="daypick" id="dayPick">
-      <button data-day="d1" class="active">D1<br>Upper</button>
-      <button data-day="d2">D2<br>Lower</button>
-      <button data-day="stairs">D3<br>Stairs</button>
-      <button data-day="d4">D4<br>Upper</button>
-      <button data-day="d5">D5<br>Lower</button>
+      <button data-day="d1" class="active">D1<br>Upper A</button>
+      <button data-day="s1">D2<br>Stairs</button>
+      <button data-day="d3">D3<br>Upper B</button>
+      <button data-day="s2">D4<br>Stairs</button>
     </div>
     <div class="rirbanner" id="rirBanner"></div>
   </div>
@@ -263,8 +262,8 @@ function programWeek(w){
     mesoWeek: mesoWeekOf(w),
     deload: isDeloadWeek(w),
     rir: rirLabel(w),
-    stairSessions: 1,
-    strengthSessions: 4,
+    stairSessions: 2,
+    strengthSessions: 2,
     floorsPerSession: floorBase,
     vest: vest,
     strength: [
@@ -272,8 +271,7 @@ function programWeek(w){
       {name:'Pull-ups (per set ×3)', val: pullups+' reps'},
       {name:'Push-ups (per set ×3)', val: pushups+' reps'},
       {name:'Sit-ups (per set ×3)', val: situps+' reps'},
-      {name:'Flutter kicks 4-ct (per set ×2)', val: flutter+' reps'},
-      {name:'Back squat / Deadlift', val: '4×6 heavy'}
+      {name:'Flutter kicks 4-ct (per set ×2)', val: flutter+' reps'}
     ]
   };
 }
@@ -436,33 +434,25 @@ function getRecommendation(exName){
   return {sets:sets, reps:reps, weight:weight, note:note};
 }
 
-/* ---------- 5-day split: Upper / Lower / Stairs / Upper / Lower ---------- */
+/* ---------- 4-day split: Upper A / Stairs / Upper B / Stairs ---------- */
 var WORKOUT_DAYS = {
   d1:{name:'Day 1 — Upper Body A', ex:[
     {n:'Pull-ups', m:'Back'},
     {n:'Bench press', m:'Chest'},
     {n:'Overhead press', m:'Shoulders'},
     {n:'Push-ups', m:'Chest'},
-    {n:'Hanging leg raises', m:'Core'}]},
-  d2:{name:'Day 2 — Lower Body A', ex:[
-    {n:'Back squat', m:'Quads'},
-    {n:'Romanian deadlift', m:'Hamstrings'},
-    {n:'Walking lunges', m:'Quads'},
     {n:'Weighted sit-ups', m:'Core'},
-    {n:'Flutter kicks (4-ct)', m:'Core'}]},
-  d4:{name:'Day 4 — Upper Body B', ex:[
+    {n:'Hanging leg raises', m:'Core'}]},
+  d3:{name:'Day 3 — Upper Body B', ex:[
     {n:'Barbell row', m:'Back'},
     {n:'Dips', m:'Chest'},
     {n:'Push-ups', m:'Chest'},
+    {n:'Flutter kicks (4-ct)', m:'Core'},
     {n:'Russian twists', m:'Core'},
-    {n:'Plank (sec)', m:'Core'}]},
-  d5:{name:'Day 5 — Lower Body B', ex:[
-    {n:'Deadlift', m:'Hamstrings'},
-    {n:'Front squat', m:'Quads'},
-    {n:'Calf raises', m:'Calves'},
-    {n:'Sit-ups', m:'Core'},
-    {n:'V-ups', m:'Core'}]}
+    {n:'Plank (sec)', m:'Core'}]}
 };
+var DAY_LABELS = {d1:'DAY 1', s1:'DAY 2', d3:'DAY 3', s2:'DAY 4'};
+function isStairsDay(d){ return d.charAt(0)==='s'; }
 var currentDay = 'd1';
 
 /* ---------- workout view ---------- */
@@ -516,14 +506,13 @@ function addCustomEx(){
 function renderWorkout(){
   var cw = currentWeek();
   var area = document.getElementById('workoutArea');
-  document.getElementById('woTitle').innerHTML = 'WEEK '+cw+' <span>'+
-    (currentDay==='stairs' ? 'DAY 3' : 'DAY '+currentDay.slice(1))+'</span>';
+  document.getElementById('woTitle').innerHTML = 'WEEK '+cw+' <span>'+DAY_LABELS[currentDay]+'</span>';
   document.getElementById('rirBanner').innerHTML =
     'Meso '+mesoOf(cw)+' &middot; Week '+mesoWeekOf(cw)+' of 6 &mdash; <b>'+rirLabel(cw)+'</b>';
 
-  if (currentDay==='stairs'){
+  if (isStairsDay(currentDay)){
     var p = programWeek(cw);
-    document.getElementById('woSub').textContent = 'Day 3 — StairMaster Floor Climb';
+    document.getElementById('woSub').textContent = (currentDay==='s1'?'Day 2':'Day 4')+' — StairMaster Floor Climb';
     area.innerHTML = '<div class="card excard">'+
       '<span class="chip">CARDIO</span><h3>StairMaster</h3>'+
       '<div class="reco">&#9654; Target: '+p.floorsPerSession+' floors'+
@@ -555,7 +544,7 @@ function finishWorkout(){
     date: document.getElementById('logDate').value || todayStr(),
     notes: document.getElementById('logNotes').value.trim()
   };
-  if (currentDay==='stairs'){
+  if (isStairsDay(currentDay)){
     log.type = 'stairs';
     log.floors = parseInt(document.getElementById('floors').value)||0;
     log.minutes = parseInt(document.getElementById('minutes').value)||0;
