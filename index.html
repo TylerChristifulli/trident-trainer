@@ -43,6 +43,9 @@
   .exrow .del{background:none; border:none; color:var(--red); font-size:18px; cursor:pointer;}
   .exwrap{margin-bottom:12px;}
   .reco{font-size:12px; color:var(--accent2); margin:6px 0 4px; line-height:1.4;}
+  .howto{font-size:12.5px; color:var(--muted); margin:6px 0 2px; line-height:1.5;}
+  .howto a{color:var(--accent); text-decoration:none; white-space:nowrap;}
+  .howto a:hover{text-decoration:underline;}
   .rirbanner{margin-top:12px; padding:10px 12px; background:rgba(212,160,23,.08); border:1px solid var(--accent); border-radius:8px; font-size:13px; color:var(--text);}
   .wohead{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
   .wotitle{font-size:22px; font-weight:800; letter-spacing:1px;}
@@ -452,6 +455,33 @@ var WORKOUT_DAYS = {
     {n:'Plank (sec)', m:'Core'}]}
 };
 var DAY_LABELS = {d1:'DAY 1', s1:'DAY 2', d3:'DAY 3', s2:'DAY 4'};
+
+/* ---------- exercise form cues + demo links ---------- */
+var EX_INFO = {
+  'Plank (sec)':'Forearms down, straight line head to heels. Brace abs and squeeze glutes — no sagging hips.',
+  'Pull-ups':'Dead hang to chin over the bar. Full extension at the bottom, no kipping or swinging.',
+  'Push-ups':'Rigid plank body, hands under shoulders. Chest to deck, full lockout every rep.',
+  'Sit-ups':'Feet anchored, hands crossed on chest. Up until elbows touch thighs, controlled down.',
+  'Flutter kicks (4-ct)':'On your back, legs straight, heels 6 inches off deck. Small alternating kicks — 4 kicks = 1 rep. Press lower back into the floor.',
+  'Hanging leg raises':'Hang from the bar, raise straight legs to hip height or above. No swinging between reps.',
+  'Back squat':'Bar on traps, brace hard, sit hips back and down below parallel. Drive up through mid-foot.',
+  'Front squat':'Bar on front delts, elbows high. Stay upright, squat to depth, drive up.',
+  'Deadlift':'Bar over mid-foot, flat back, chest up. Push the floor away and stand tall — no rounding.',
+  'Romanian deadlift':'Soft knees, hinge at the hips, bar sliding down your thighs. Stop at hamstring stretch, squeeze glutes up.',
+  'Walking lunges':'Long step, back knee just off the floor, front knee tracking over toes. Alternate legs.',
+  'Calf raises':'Full stretch at the bottom, pause hard at the top. Slow and controlled.',
+  'Overhead press':'Squeeze glutes, brace abs, press the bar to lockout directly over ears. No leg drive.',
+  'Bench press':'Shoulder blades pinned back, feet planted. Bar to mid-chest, press to lockout.',
+  'Barbell row':'Hinge to ~45°, flat back. Pull the bar to your belly, squeeze shoulder blades, no jerking.',
+  'Dips':'Shoulders down away from ears, lean slightly forward. Descend to 90° elbows, press to lockout.',
+  'Weighted sit-ups':'Hold a plate on your chest. Same strict form as sit-ups — controlled both directions.',
+  'Russian twists':'Seated, heels light or off the floor. Rotate your torso side to side — the weight follows, don’t just swing arms.',
+  'V-ups':'Lying flat, lift legs and torso together to touch your toes at the top. Lower with control.'
+};
+function exDemoLink(name){
+  var q = name.replace(/\s*\(.*\)/,'') + ' proper form';
+  return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
+}
 function isStairsDay(d){ return d.charAt(0)==='s'; }
 var currentDay = 'd1';
 
@@ -474,9 +504,12 @@ function exCard(name, muscle, r){
       '<input type="number" class="rp" placeholder="reps" value="'+(r.reps||'')+'">'+
       '<input type="checkbox" class="ck"></div>';
   }
+  var info = EX_INFO[name] ? '<div class="howto">'+EX_INFO[name]+
+    ' <a href="'+exDemoLink(name)+'" target="_blank" rel="noopener">Watch demo &#9654;</a></div>' : '';
   return '<div class="card excard" data-ex="'+name+'">'+
     '<span class="chip">'+muscle.toUpperCase()+'</span>'+
     '<h3>'+name+'</h3>'+
+    info+
     '<div class="reco">&#9654; '+r.note+'</div>'+
     '<div class="sethead"><span>Weight</span><span>Reps</span><span>Log</span></div>'+
     rows+
@@ -515,6 +548,8 @@ function renderWorkout(){
     document.getElementById('woSub').textContent = (currentDay==='s1'?'Day 2':'Day 4')+' — StairMaster Floor Climb';
     area.innerHTML = '<div class="card excard">'+
       '<span class="chip">CARDIO</span><h3>StairMaster</h3>'+
+      '<div class="howto">Stay upright — hands resting light, not gripping the rails. Full steps, steady pace you can hold the whole session. '+
+      '<a href="https://www.youtube.com/results?search_query=stairmaster+technique+tips" target="_blank" rel="noopener">Watch demo &#9654;</a></div>'+
       '<div class="reco">&#9654; Target: '+p.floorsPerSession+' floors'+
       (p.vest?' @ '+p.vest+' lb vest':'')+(p.deload?' (deload — easy pace)':'')+'</div>'+
       '<label>Floors Climbed</label><input type="number" id="floors" placeholder="e.g. '+p.floorsPerSession+'">'+
