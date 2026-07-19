@@ -51,7 +51,7 @@
   .howto a:hover{text-decoration:underline;}
   .cmp{margin:10px 0 4px;}
   .cmpbar{position:relative; height:8px; background:var(--panel2); border-radius:4px;}
-  .cmpfill{height:100%; background:var(--green); border-radius:4px; transition:width .3s;}
+  .cmpfill{height:100%; background:var(--green); border-radius:4px; transition:width .9s cubic-bezier(.22,1,.36,1);}
   .cmptick{position:absolute; top:-3px; width:2px; height:14px; background:var(--muted);}
   .cmptick.gold{background:var(--accent);}
   .cmptext{font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5;}
@@ -59,6 +59,20 @@
   .gold{color:var(--accent);}
   .savestatus{font-size:12px; color:var(--green); margin-top:8px; min-height:15px;}
   .tgtline{display:inline-block; margin-top:10px; padding:5px 12px; border:1px solid var(--accent); border-radius:6px; font-size:13px; font-weight:700; letter-spacing:.5px; color:var(--accent); background:rgba(212,160,23,.08);}
+  #hooyah{position:fixed; inset:0; z-index:200; background:rgba(8,12,17,.96); display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; cursor:pointer;}
+  #hooyah.show{display:flex; animation:hyFade .25s;}
+  .hymark{font-size:64px; animation:hyPop .6s cubic-bezier(.2,1.4,.4,1) both;}
+  .hytitle{font-size:42px; font-weight:900; letter-spacing:8px; color:var(--accent); text-transform:uppercase; animation:hyPop .6s .12s cubic-bezier(.2,1.4,.4,1) both;}
+  .hysub{color:var(--muted); letter-spacing:2px; margin:6px 0 24px; text-transform:uppercase; font-size:13px; animation:hyFade .5s .35s both;}
+  #hyRows{width:100%; max-width:480px; animation:hyFade .5s .45s both; margin-bottom:20px;}
+  .hyrow{margin-bottom:18px; text-align:left;}
+  .hyname{font-size:15px; font-weight:700; margin-bottom:7px;}
+  .pbtag{font-size:10px; font-weight:800; background:var(--green); color:#0b0f14; border-radius:10px; padding:2px 9px; letter-spacing:1px; vertical-align:2px; margin-left:8px;}
+  .hytext{font-size:12px; color:var(--muted); margin-top:6px;}
+  .hyfill{transition:width 1.2s cubic-bezier(.22,1,.36,1);}
+  #hooyah .btn{max-width:300px; animation:hyFade .5s .6s both;}
+  @keyframes hyPop{0%{transform:scale(0) rotate(-12deg); opacity:0} 60%{transform:scale(1.15) rotate(3deg); opacity:1} 100%{transform:scale(1) rotate(0); opacity:1}}
+  @keyframes hyFade{from{opacity:0} to{opacity:1}}
   .rirbanner{margin-top:12px; padding:10px 12px; background:rgba(212,160,23,.08); border:1px solid var(--accent); border-radius:8px; font-size:13px; color:var(--text);}
   .wohead{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
   .wotitle{font-size:22px; font-weight:800; letter-spacing:1px;}
@@ -251,6 +265,14 @@
 </section>
 
 </main>
+
+<div id="hooyah" onclick="hideHooyah()">
+  <div class="hymark">&#128305;</div>
+  <div class="hytitle">Hooyah!</div>
+  <div class="hysub">Workout Logged</div>
+  <div id="hyRows"></div>
+  <button class="btn" onclick="hideHooyah()">Continue &rarr;</button>
+</div>
 
 <script>
 /* ---------- state & storage ---------- */
@@ -816,6 +838,7 @@ function autoSave(){
   sbSaveLog(draft);
   var t = new Date();
   setSaveStatus('Auto-saved '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+' ✓');
+  refreshBars();
   renderPlan();
 }
 function restoreDraft(){
@@ -858,6 +881,83 @@ function restoreDraft(){
   }
   document.getElementById('logNotes').value = draft.notes||'';
 }
+/* ---------- hooyah animation + live bar updates ---------- */
+function bestPerformanceExcluding(name, ratio, excludeLog){
+  var best = 0;
+  state.logs.forEach(function(l){
+    if (l === excludeLog || l.type!=='strength') return;
+    (l.exercises||[]).forEach(function(e){
+      if (e.name!==name) return;
+      if (ratio){ if (e.weight>best) best = e.weight; }
+      else if (e.setDetails){ e.setDetails.forEach(function(s){ if (s.reps>best) best = s.reps; }); }
+      else if (e.reps>best){ best = e.reps; }
+    });
+  });
+  return best;
+}
+function refreshBars(){
+  document.querySelectorAll('#workoutArea .excard[data-ex]').forEach(function(card){
+    var name = card.dataset.ex, b = BENCHMARKS[name];
+    if (!b) return;
+    var fill = card.querySelector('.cmpfill'); if (!fill) return;
+    var ratio = !!b.ratio, bw = currentBodyweight();
+    if (ratio && !bw) return;
+    var you = bestPerformance(name, ratio);
+    var val = ratio ? (you ? you/bw : 0) : you;
+    var w = Math.min(100, Math.round(val/(b.top*1.2)*100)) + '%';
+    if (fill.style.width !== w){
+      fill.style.width = w;
+      var bEl = card.querySelector('.cmptext b');
+      if (bEl && you) bEl.textContent = ratio ? (you+' lb ('+val.toFixed(2)+'×BW)')
+                                              : (you + (name==='Plank (sec)' ? ' sec' : ' reps'));
+    }
+  });
+}
+function showHooyah(log){
+  var rows = '';
+  if (log.type==='stairs'){
+    var p = programWeek(currentWeek());
+    var pctT = Math.min(100, Math.round((log.floors/p.floorsPerSession)*100));
+    rows = '<div class="hyrow"><div class="hyname">StairMaster'+(log.floors>=p.floorsPerSession?' <span class="pbtag">TARGET HIT</span>':'')+'</div>'+
+      '<div class="cmpbar"><div class="cmpfill hyfill" data-w="'+Math.min(100,pctT)+'" style="width:0%"></div></div>'+
+      '<div class="hytext">'+log.floors+' floors'+(log.vest?' @ '+log.vest+' lb vest':'')+' &middot; '+pctT+'% of today\'s '+p.floorsPerSession+'-floor target</div></div>';
+  } else {
+    (log.exercises||[]).forEach(function(e){
+      var b = BENCHMARKS[e.name]; if (!b) return;
+      var ratio = !!b.ratio, bw = currentBodyweight();
+      if (ratio && !bw) return;
+      var oldBest = bestPerformanceExcluding(e.name, ratio, log);
+      var thisBest = ratio ? e.weight : e.reps;
+      var newBest = Math.max(oldBest, thisBest);
+      var max = b.top*1.2;
+      var oldVal = ratio ? oldBest/bw : oldBest;
+      var newVal = ratio ? newBest/bw : newBest;
+      var oldPct = Math.min(100, Math.round(oldVal/max*100));
+      var newPct = Math.min(100, Math.round(newVal/max*100));
+      var pctSeal = Math.min(999, Math.round(newVal/b.top*100));
+      var unit = e.name==='Plank (sec)' ? ' sec' : (ratio ? '×BW' : ' reps');
+      rows += '<div class="hyrow"><div class="hyname">'+e.name+
+        (newBest>oldBest && oldBest>0 ? ' <span class="pbtag">NEW BEST</span>' : '')+'</div>'+
+        '<div class="cmpbar"><div class="cmpfill hyfill" data-w="'+newPct+'" style="width:'+oldPct+'%"></div>'+
+        '<span class="cmptick" style="left:'+Math.min(100,Math.round((b.avg/max)*100))+'%"></span>'+
+        '<span class="cmptick gold" style="left:'+Math.min(100,Math.round((b.top/max)*100))+'%"></span></div>'+
+        '<div class="hytext">'+(ratio ? newVal.toFixed(2)+'×BW' : newBest+unit)+
+        ' &middot; <span class="gold">'+pctSeal+'% of '+b.tL+'</span></div></div>';
+    });
+  }
+  document.getElementById('hyRows').innerHTML = rows;
+  var ov = document.getElementById('hooyah');
+  ov.classList.add('show');
+  setTimeout(function(){
+    ov.querySelectorAll('.hyfill').forEach(function(f){ f.style.width = f.dataset.w + '%'; });
+  }, 550);
+}
+function hideHooyah(){
+  document.getElementById('hooyah').classList.remove('show');
+  selectDay(nextWorkoutDay());
+  renderPlan();
+}
+
 function finishWorkout(){
   autoSave();
   var date = document.getElementById('logDate').value || todayStr();
@@ -876,8 +976,7 @@ function finishWorkout(){
   }
   persist();
   sbSaveLog(draft);
-  alert('Workout saved. Hooyah!');
-  selectDay(nextWorkoutDay());
+  showHooyah(draft);
   renderPlan();
 }
 
