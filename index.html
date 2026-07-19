@@ -58,6 +58,7 @@
   .cmptext b{color:var(--green);}
   .gold{color:var(--accent);}
   .savestatus{font-size:12px; color:var(--green); margin-top:8px; min-height:15px;}
+  .tgtline{display:inline-block; margin-top:10px; padding:5px 12px; border:1px solid var(--accent); border-radius:6px; font-size:13px; font-weight:700; letter-spacing:.5px; color:var(--accent); background:rgba(212,160,23,.08);}
   .rirbanner{margin-top:12px; padding:10px 12px; background:rgba(212,160,23,.08); border:1px solid var(--accent); border-radius:8px; font-size:13px; color:var(--text);}
   .wohead{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
   .wotitle{font-size:22px; font-weight:800; letter-spacing:1px;}
@@ -437,18 +438,23 @@ function getRecommendation(exName){
   var cw = currentWeek();
   var lp = lastPerformance(exName);
   var bw = isBW(exName) ? currentBodyweight() : 0;
+  var unit = (exName==='Plank (sec)') ? 'sec' : 'reps';
   if (isDeloadWeek(cw)){
-    if (!lp) return {sets:2, reps:'', weight: bw||'', note:'Deload week — 2 easy sets, 4+ RIR.'};
+    if (!lp) return {sets:2, reps:'', weight: bw||'', target:'2 easy sets, 4+ RIR',
+                     note:'Deload week — 2 easy sets, 4+ RIR.'};
     var e = lp.perf.entry;
-    return {sets: Math.max(2, Math.round(e.sets/2)),
-            reps: e.reps,
-            weight: isBW(exName) ? (bw||e.weight) : (e.weight ? roundTo5(e.weight*0.6) : 0),
+    var dw = isBW(exName) ? (bw||e.weight) : (e.weight ? roundTo5(e.weight*0.6) : 0);
+    var ds = Math.max(2, Math.round(e.sets/2));
+    return {sets: ds, reps: e.reps, weight: dw,
+            target: ds+' × '+e.reps+' '+unit+(dw?' @ '+dw+' lb':'')+' — easy',
             note: 'Deload — half the sets'+(isBW(exName)?'':' at ~60% load')+'. Recover.'};
   }
   if (!lp) return {sets:3, reps:'', weight: bw||'',
+    target: isBW(exName) ? '3 sets × max '+unit+' @ bodyweight, stop at '+rirLabel(cw).split(' (')[0]
+                         : '3 sets × 6–10 reps — find a weight you finish at '+rirLabel(cw).split(' (')[0],
     note:(isBW(exName)&&bw?'Bodyweight ('+bw+' lb). ':'')+'First time — pick a load/reps you finish at '+rirLabel(cw)+'.'};
   var e = lp.perf.entry;
-  var sets = e.sets, reps = e.reps, weight = e.weight||0, note;
+  var sets = e.sets, reps = e.reps, weight = e.weight||0, note, target;
   // Set progression: only accumulate within the same meso; new meso resets to 3.
   if (lp.sameMeso){
     sets = Math.min(6, Math.max(2, sets + feedbackAdj(lp.perf.log.feedback)));
@@ -459,18 +465,22 @@ function getRecommendation(exName){
   if (isBW(exName)){
     reps = reps+2;
     weight = bw || weight;
-    note='Last: '+e.reps+' reps/set. Bodyweight'+(bw?' ('+bw+' lb)':'')+' — add 2 reps per set.';
+    target = sets+' sets × '+reps+' '+unit+' @ bodyweight'+(bw?' ('+bw+' lb)':'');
+    note='Last: '+e.reps+' '+unit+'/set. Bodyweight'+(bw?' ('+bw+' lb)':'')+' — add 2 '+unit+' per set.';
   } else if (weight>0){
     if (reps>=10){ weight = roundTo5(weight*1.05); reps = Math.max(6, reps-3);
+      target = sets+' sets × 6–10 reps @ '+weight+' lb (start at '+reps+')';
       note='Hit top of rep range last time ('+e.weight+'×'+e.reps+') — add load, drop reps.'; }
     else { reps = reps+1;
+      target = sets+' sets × 6–10 reps @ '+weight+' lb (aim for '+reps+')';
       note='Last: '+e.weight+' lb × '+e.reps+'. Same weight, +1 rep per set.'; }
   } else {
     reps = reps+2;
-    note='Last: '+e.reps+' reps/set. Add 2 reps per set.';
+    target = sets+' sets × '+reps+' '+unit;
+    note='Last: '+e.reps+' '+unit+'/set. Add 2 '+unit+' per set.';
   }
   note += ' Train to '+rirLabel(cw)+'.';
-  return {sets:sets, reps:reps, weight:weight, note:note};
+  return {sets:sets, reps:reps, weight:weight, target:target, note:note};
 }
 
 /* ---------- 4-day split: Upper A / Stairs / Upper B / Stairs ---------- */
@@ -675,6 +685,7 @@ function exCard(name, muscle, r){
     '<h3>'+name+'</h3>'+
     info+
     benchmarkHTML(name)+
+    (r.target ? '<div class="tgtline">TARGET: '+r.target+'</div>' : '')+
     '<div class="reco">&#9654; '+r.note+'</div>'+
     '<div class="sethead"><span>Weight</span><span>Reps</span><span>Log</span></div>'+
     rows+
