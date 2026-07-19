@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trident Trainer — SEAL Prep Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#131a22; --panel2:#1a232e; --border:#243140;
+    --text:#e8eef4; --muted:#8fa3b5; --accent:#d4a017; --accent2:#3fa7d6;
+    --green:#4caf7d; --red:#e05d5d;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif; min-height:100vh;}
+  header{padding:20px 16px 12px; text-align:center; border-bottom:1px solid var(--border); background:linear-gradient(180deg,#101820,#0b0f14);}
+  header h1{font-size:22px; letter-spacing:4px; text-transform:uppercase; color:var(--accent);}
+  header .sub{color:var(--muted); font-size:12px; letter-spacing:2px; margin-top:4px; text-transform:uppercase;}
+  .weekbadge{display:inline-block; margin-top:10px; padding:4px 14px; border:1px solid var(--accent); border-radius:20px; font-size:13px; color:var(--accent); letter-spacing:1px;}
+  nav{display:flex; border-bottom:1px solid var(--border); background:var(--panel); position:sticky; top:0; z-index:10;}
+  nav button{flex:1; background:none; border:none; color:var(--muted); padding:13px 4px; font-size:13px; cursor:pointer; letter-spacing:1px; text-transform:uppercase; border-bottom:2px solid transparent;}
+  nav button.active{color:var(--accent); border-bottom-color:var(--accent);}
+  main{max-width:760px; margin:0 auto; padding:16px;}
+  .card{background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:16px; margin-bottom:14px;}
+  .card h2{font-size:14px; text-transform:uppercase; letter-spacing:2px; color:var(--accent2); margin-bottom:12px;}
+  .target{display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid var(--border);}
+  .target:last-child{border-bottom:none;}
+  .target .name{font-size:15px;}
+  .target .val{font-weight:700; color:var(--accent); font-size:16px;}
+  .target .done{color:var(--green); font-weight:700;}
+  .progressbar{height:8px; background:var(--panel2); border-radius:4px; overflow:hidden; margin-top:6px;}
+  .progressbar div{height:100%; background:var(--green); transition:width .3s;}
+  label{display:block; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px;}
+  input,select,textarea{width:100%; background:var(--panel2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:10px; font-size:15px;}
+  input:focus,select:focus{outline:none; border-color:var(--accent2);}
+  .row{display:flex; gap:10px;}
+  .row>div{flex:1;}
+  .btn{display:block; width:100%; background:var(--accent); color:#0b0f14; border:none; border-radius:6px; padding:13px; font-size:15px; font-weight:700; letter-spacing:1px; text-transform:uppercase; cursor:pointer; margin-top:16px;}
+  .btn.secondary{background:var(--panel2); color:var(--text); border:1px solid var(--border);}
+  .btn.small{width:auto; padding:8px 14px; font-size:12px; margin-top:0; display:inline-block;}
+  .exrow{display:grid; grid-template-columns:2fr 1fr 1fr 1fr 34px; gap:6px; margin-bottom:6px; align-items:center;}
+  .exrow input,.exrow select{padding:8px 6px; font-size:14px;}
+  .exrow .del{background:none; border:none; color:var(--red); font-size:18px; cursor:pointer;}
+  .exwrap{margin-bottom:12px;}
+  .reco{font-size:12px; color:var(--accent2); margin:6px 0 4px; line-height:1.4;}
+  .rirbanner{margin-top:12px; padding:10px 12px; background:rgba(212,160,23,.08); border:1px solid var(--accent); border-radius:8px; font-size:13px; color:var(--text);}
+  .wohead{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
+  .wotitle{font-size:22px; font-weight:800; letter-spacing:1px;}
+  .wotitle span{color:var(--muted);}
+  .wosub{font-size:13px; color:var(--muted); margin-top:2px;}
+  .daypick{display:flex; gap:6px; margin-top:4px;}
+  .daypick button{flex:1; background:var(--panel2); border:1px solid var(--border); color:var(--muted); border-radius:8px; padding:7px 2px; font-size:12px; line-height:1.35; cursor:pointer; letter-spacing:.5px;}
+  .daypick button.active{border-color:var(--accent); color:var(--accent); font-weight:700;}
+  .excard h3{font-size:19px; font-weight:800; margin:6px 0 0;}
+  .chip{display:inline-block; font-size:11px; font-weight:700; letter-spacing:1.5px; padding:4px 12px; border-radius:8px; background:rgba(76,175,125,.15); color:var(--green);}
+  .sethead{display:grid; grid-template-columns:1fr 1fr 64px; gap:10px; margin-top:12px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; text-align:center;}
+  .setrow{display:grid; grid-template-columns:1fr 1fr 64px; gap:10px; margin-top:8px; align-items:center;}
+  .setrow input[type=number]{text-align:center; font-size:17px; font-weight:700; padding:12px 6px;}
+  .setrow input[type=checkbox]{appearance:none; -webkit-appearance:none; width:30px; height:30px; border:2px solid var(--green); border-radius:8px; background:none; cursor:pointer; justify-self:center; position:relative;}
+  .setrow input[type=checkbox]:checked{background:var(--green);}
+  .setrow input[type=checkbox]:checked::after{content:'✓'; position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#0b0f14; font-weight:900; font-size:18px;}
+  .addset{display:block; width:100%; margin-top:12px; background:none; border:1px dashed var(--border); color:var(--muted); border-radius:8px; padding:9px; cursor:pointer; font-size:13px;}
+  .addset:hover{color:var(--accent2); border-color:var(--accent2);}
+  .histitem{background:var(--panel2); border:1px solid var(--border); border-radius:8px; padding:12px; margin-bottom:10px;}
+  .histitem .top{display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;}
+  .histitem .date{font-size:13px; color:var(--muted);}
+  .histitem .tag{font-size:11px; padding:2px 10px; border-radius:12px; letter-spacing:1px; text-transform:uppercase;}
+  .tag.stairs{background:rgba(63,167,214,.15); color:var(--accent2);}
+  .tag.strength{background:rgba(212,160,23,.15); color:var(--accent);}
+  .histitem .detail{font-size:14px; line-height:1.5;}
+  .histitem .rm{background:none; border:none; color:var(--red); cursor:pointer; font-size:12px; margin-top:6px;}
+  canvas{width:100%; background:var(--panel2); border-radius:8px;}
+  .stat{text-align:center; padding:10px;}
+  .stat .num{font-size:26px; font-weight:800; color:var(--accent);}
+  .stat .lbl{font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-top:2px;}
+  .statgrid{display:grid; grid-template-columns:repeat(3,1fr);}
+  .empty{color:var(--muted); text-align:center; padding:24px; font-size:14px;}
+  .note{font-size:12px; color:var(--muted); margin-top:10px; line-height:1.5;}
+  .weeknav{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .weeknav button{background:var(--panel2); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 14px; cursor:pointer; font-size:14px;}
+  .weeknav span{font-size:14px; color:var(--accent); letter-spacing:1px; font-weight:700;}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Trident Trainer</h1>
+  <div class="sub">Navy SEAL Prep &middot; Stairs + Strength</div>
+  <div class="weekbadge" id="weekBadge">Week 1 of 12</div>
+</header>
+
+<nav>
+  <button class="active" data-tab="plan">Plan</button>
+  <button data-tab="log">Workout</button>
+  <button data-tab="progress">Progress</button>
+  <button data-tab="history">History</button>
+</nav>
+
+<main>
+
+<!-- ============ PLAN TAB ============ -->
+<section id="tab-plan">
+  <div class="card">
+    <h2>This Week's Targets</h2>
+    <div class="weeknav">
+      <button onclick="shiftWeek(-1)">&larr;</button>
+      <span id="weekLabel">Week 1</span>
+      <button onclick="shiftWeek(1)">&rarr;</button>
+    </div>
+    <div id="weekTargets"></div>
+  </div>
+
+  <div class="card">
+    <h2>Weekly Completion</h2>
+    <div id="weekCompletion"></div>
+  </div>
+
+  <div class="card">
+    <h2>Program Settings</h2>
+    <label>Program Start Date</label>
+    <input type="date" id="startDate" onchange="setStartDate(this.value)">
+    <p class="note">12 weeks = two 6-week mesocycles (RP-style). Each meso: 5 weeks of accumulating volume with intensity ramping from 3 RIR down to 0 RIR, then a deload. Lifting targets auto-progress from your logged sessions — hit the top of a rep range and the app bumps the load; your post-workout feedback adds or removes sets the following week.</p>
+  </div>
+
+  <div class="card">
+    <h2>Cloud Sync — Supabase</h2>
+    <label>Project URL</label>
+    <input id="sbUrl" placeholder="https://yourproject.supabase.co">
+    <label>Anon (public) Key</label>
+    <input id="sbKey" placeholder="eyJhbGciOi...">
+    <button class="btn secondary" onclick="connectSupabase()">Connect &amp; Sync</button>
+    <p class="note" id="sbStatus">Not connected — data stays in this browser.</p>
+    <p class="note">One-time setup: create a free project at supabase.com, run the setup SQL (supabase-setup.sql) in the SQL Editor, then paste your Project URL and anon key from Settings &rarr; API. Your workouts then sync across every device you open this app on.</p>
+  </div>
+</section>
+
+<!-- ============ LOG TAB (workout view) ============ -->
+<section id="tab-log" class="hidden">
+  <div class="card">
+    <div class="wohead">
+      <div>
+        <div class="wotitle" id="woTitle">WEEK 1 <span>DAY 1</span></div>
+        <div class="wosub" id="woSub"></div>
+      </div>
+      <input type="date" id="logDate" style="width:auto">
+    </div>
+    <div class="daypick" id="dayPick">
+      <button data-day="d1" class="active">D1<br>Upper</button>
+      <button data-day="d2">D2<br>Lower</button>
+      <button data-day="stairs">D3<br>Stairs</button>
+      <button data-day="d4">D4<br>Upper</button>
+      <button data-day="d5">D5<br>Lower</button>
+    </div>
+    <div class="rirbanner" id="rirBanner"></div>
+  </div>
+
+  <div id="workoutArea"></div>
+
+  <div class="card" id="fbCard">
+    <h2>Post-Workout Feedback</h2>
+    <div class="row" id="fbRow">
+      <div><label>Pump</label>
+        <select id="fbPump">
+          <option value="0">None</option><option value="1" selected>Decent</option>
+          <option value="2">Great</option><option value="3">Insane</option>
+        </select></div>
+      <div><label>Soreness</label>
+        <select id="fbSore">
+          <option value="0">None</option><option value="1" selected>Slight</option>
+          <option value="2">Still sore</option><option value="3">Wrecked</option>
+        </select></div>
+      <div><label>How hard?</label>
+        <select id="fbDiff">
+          <option value="0">Easy</option><option value="1" selected>Moderate</option>
+          <option value="2">Hard</option><option value="3">Maxed out</option>
+        </select></div>
+    </div>
+    <label>Notes</label>
+    <textarea id="logNotes" rows="2" placeholder="How did it feel?"></textarea>
+    <button class="btn" onclick="finishWorkout()">Finish Workout</button>
+  </div>
+</section>
+
+<!-- ============ PROGRESS TAB ============ -->
+<section id="tab-progress" class="hidden">
+  <div class="card">
+    <div class="statgrid">
+      <div class="stat"><div class="num" id="statFloors">0</div><div class="lbl">Total Floors</div></div>
+      <div class="stat"><div class="num" id="statSessions">0</div><div class="lbl">Workouts</div></div>
+      <div class="stat"><div class="num" id="statStreak">0</div><div class="lbl">Week Streak</div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Floors Per Stair Session</h2>
+    <canvas id="chartFloors" height="200"></canvas>
+  </div>
+  <div class="card">
+    <h2>Weekly Strength Volume (total reps)</h2>
+    <canvas id="chartVolume" height="200"></canvas>
+  </div>
+  <div class="card">
+    <h2>Data</h2>
+    <div class="row">
+      <div><button class="btn small secondary" style="width:100%" onclick="exportData()">Export JSON</button></div>
+      <div><button class="btn small secondary" style="width:100%" onclick="document.getElementById('importFile').click()">Import JSON</button></div>
+    </div>
+    <input type="file" id="importFile" class="hidden" accept=".json" onchange="importData(event)">
+    <p class="note" id="storageNote"></p>
+  </div>
+</section>
+
+<!-- ============ HISTORY TAB ============ -->
+<section id="tab-history" class="hidden">
+  <div class="card">
+    <h2>Workout History</h2>
+    <div id="histList"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ---------- state & storage ---------- */
+var state = { startDate: todayStr(), logs: [] };
+var storageOK = false;
+try {
+  localStorage.setItem('__t','1'); localStorage.removeItem('__t');
+  storageOK = true;
+  var saved = localStorage.getItem('tridentTrainer');
+  if (saved) state = JSON.parse(saved);
+} catch(e){ storageOK = false; }
+
+function persist(){
+  if (storageOK){ try{ localStorage.setItem('tridentTrainer', JSON.stringify(state)); }catch(e){} }
+}
+function todayStr(){
+  var d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+/* ---------- 12-week program = two 6-week mesocycles ---------- */
+/* Meso structure (RP-style): 5 accumulation weeks with RIR ramping 3→0, then deload.
+   Deload weeks: 6 and 12 (stairs and strength both back off). */
+var RIR_TARGETS = [3,2,1,1,0,null]; // by meso week; null = deload
+function mesoWeekOf(w){ return ((w-1)%6)+1; }
+function isDeloadWeek(w){ return mesoWeekOf(w)===6; }
+function rirLabel(w){
+  var r = RIR_TARGETS[mesoWeekOf(w)-1];
+  return r===null ? 'Deload — 4+ RIR, easy' : r+' RIR (reps left in tank)';
+}
+function programWeek(w){
+  w = Math.min(Math.max(w,1),12);
+  var floorBase = [50,60,70,80,90,60,100,110,125,135,150,95][w-1];
+  var vest      = [0,0,0,10,10,0,20,20,20,30,30,10][w-1];
+  var plank     = [60,75,90,105,120,80,135,150,165,180,200,120][w-1];
+  var pullups   = [3,4,5,6,7,4,8,9,10,11,12,6][w-1];
+  var pushups   = [30,35,40,45,50,35,55,60,65,70,80,45][w-1];
+  var situps    = [30,35,40,45,50,35,55,60,65,70,80,45][w-1];
+  var flutter   = [40,50,60,70,80,50,90,100,110,120,140,70][w-1];
+  return {
+    week: w,
+    mesoWeek: mesoWeekOf(w),
+    deload: isDeloadWeek(w),
+    rir: rirLabel(w),
+    stairSessions: 1,
+    strengthSessions: 4,
+    floorsPerSession: floorBase,
+    vest: vest,
+    strength: [
+      {name:'Plank', val: plank+' sec'},
+      {name:'Pull-ups (per set ×3)', val: pullups+' reps'},
+      {name:'Push-ups (per set ×3)', val: pushups+' reps'},
+      {name:'Sit-ups (per set ×3)', val: situps+' reps'},
+      {name:'Flutter kicks 4-ct (per set ×2)', val: flutter+' reps'},
+      {name:'Back squat / Deadlift', val: '4×6 heavy'}
+    ]
+  };
+}
+
+function currentWeek(){
+  var start = new Date(state.startDate+'T00:00:00');
+  var now = new Date();
+  var diff = Math.floor((now-start)/(7*24*3600*1000))+1;
+  return Math.min(Math.max(diff,1),12);
+}
+
+/* ---------- week helpers ---------- */
+function weekRange(w){
+  var start = new Date(state.startDate+'T00:00:00');
+  var s = new Date(start.getTime()+(w-1)*7*24*3600*1000);
+  var e = new Date(s.getTime()+6*24*3600*1000);
+  return [s,e];
+}
+function logsInWeek(w){
+  var r = weekRange(w);
+  return state.logs.filter(function(l){
+    var d = new Date(l.date+'T00:00:00');
+    return d>=r[0] && d<=r[1];
+  });
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('nav button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('nav button').forEach(function(x){x.classList.remove('active');});
+    b.classList.add('active');
+    ['plan','log','progress','history'].forEach(function(t){
+      document.getElementById('tab-'+t).classList.toggle('hidden', t!==b.dataset.tab);
+    });
+    if (b.dataset.tab==='progress') renderProgress();
+    if (b.dataset.tab==='history') renderHistory();
+    if (b.dataset.tab==='plan') renderPlan();
+    if (b.dataset.tab==='log') renderWorkout();
+  });
+});
+
+/* ---------- plan tab ---------- */
+var viewWeek = null;
+function shiftWeek(d){
+  viewWeek = Math.min(Math.max((viewWeek||currentWeek())+d,1),12);
+  renderPlan();
+}
+function setStartDate(v){
+  if (!v) return;
+  state.startDate = v; viewWeek = null; persist(); sbSaveStart(); renderPlan();
+}
+function renderPlan(){
+  var cw = currentWeek();
+  if (viewWeek===null) viewWeek = cw;
+  var p = programWeek(viewWeek);
+  document.getElementById('weekBadge').textContent = 'Week '+cw+' of 12';
+  document.getElementById('weekLabel').textContent = 'Week '+viewWeek + (viewWeek===cw?' (current)':'');
+  document.getElementById('startDate').value = state.startDate;
+
+  var h = '';
+  h += tgt('Mesocycle', 'Meso '+mesoOf(viewWeek)+' &middot; Week '+p.mesoWeek+' of 6'+(p.deload?' — DELOAD':''));
+  h += tgt('Lifting intensity', p.rir);
+  h += tgt('StairMaster sessions', p.stairSessions+'×/week');
+  h += tgt('Floors per session', p.floorsPerSession + (p.vest?(' @ '+p.vest+' lb vest'):''));
+  h += tgt('Strength/core sessions', p.strengthSessions+'×/week');
+  p.strength.forEach(function(s){ h += tgt(s.name, s.val); });
+  document.getElementById('weekTargets').innerHTML = h;
+
+  // completion vs current week
+  var wl = logsInWeek(cw);
+  var stairDone = wl.filter(function(l){return l.type==='stairs';}).length;
+  var strDone = wl.filter(function(l){return l.type==='strength';}).length;
+  var pc = programWeek(cw);
+  var floorsDone = wl.filter(function(l){return l.type==='stairs';})
+                     .reduce(function(a,l){return a+(l.floors||0);},0);
+  var floorsTarget = pc.floorsPerSession*pc.stairSessions;
+  document.getElementById('weekCompletion').innerHTML =
+    compl('Stair sessions', stairDone, pc.stairSessions) +
+    compl('Strength sessions', strDone, pc.strengthSessions) +
+    compl('Total floors', floorsDone, floorsTarget);
+}
+function tgt(n,v){ return '<div class="target"><span class="name">'+n+'</span><span class="val">'+v+'</span></div>'; }
+function compl(n,done,total){
+  var pct = total? Math.min(100, Math.round(done/total*100)) : 0;
+  return '<div class="target" style="display:block">'+
+    '<div style="display:flex;justify-content:space-between"><span class="name">'+n+'</span>'+
+    '<span class="'+(done>=total?'done':'val')+'">'+done+' / '+total+'</span></div>'+
+    '<div class="progressbar"><div style="width:'+pct+'%"></div></div></div>';
+}
+
+/* ---------- RP-style progressive overload engine ---------- */
+var CORE_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups'];
+
+function weekOfDate(dateStr){
+  var start = new Date(state.startDate+'T00:00:00');
+  var d = new Date(dateStr+'T00:00:00');
+  return Math.min(Math.max(Math.floor((d-start)/(7*24*3600*1000))+1,1),12);
+}
+function mesoOf(w){ return w<=6 ? 1 : 2; }
+
+/* Feedback → set adjustment for next session (simplified RP auto-regulation):
+   wrecked or maxed out → drop a set; easy + no pump + no soreness → add a set. */
+function feedbackAdj(fb){
+  if (!fb) return 0;
+  if (fb.soreness>=3 || fb.difficulty>=3) return -1;
+  if (fb.soreness<=1 && fb.pump<=1 && fb.difficulty<=1) return 1;
+  return 0;
+}
+
+/* Last performance of an exercise (skipping deload-week sessions),
+   restricted to the current mesocycle so sets reset each meso. */
+function lastPerformance(exName){
+  var cw = currentWeek(), meso = mesoOf(cw);
+  var best = null, sameMeso = false;
+  for (var i=state.logs.length-1; i>=0; i--){
+    var l = state.logs[i];
+    if (l.type!=='strength') continue;
+    var lw = weekOfDate(l.date);
+    if (isDeloadWeek(lw)) continue;
+    var e = (l.exercises||[]).find(function(x){return x.name===exName;});
+    if (e){ best = {entry:e, log:l, week:lw}; sameMeso = (mesoOf(lw)===meso); break; }
+  }
+  return best ? {perf:best, sameMeso:sameMeso} : null;
+}
+
+function roundTo5(x){ return Math.max(5, Math.round(x/5)*5); }
+
+/* Core recommendation: what to do THIS session for a given exercise. */
+function getRecommendation(exName){
+  var cw = currentWeek();
+  var lp = lastPerformance(exName);
+  if (isDeloadWeek(cw)){
+    if (!lp) return {sets:2, reps:'', weight:'', note:'Deload week — 2 easy sets, 4+ RIR.'};
+    var e = lp.perf.entry;
+    return {sets: Math.max(2, Math.round(e.sets/2)),
+            reps: e.reps,
+            weight: e.weight ? roundTo5(e.weight*0.6) : 0,
+            note: 'Deload — half the sets at ~60% load. Recover.'};
+  }
+  if (!lp) return {sets:3, reps:'', weight:'', note:'First time — pick a load/reps you finish at '+rirLabel(cw)+'.'};
+  var e = lp.perf.entry;
+  var sets = e.sets, reps = e.reps, weight = e.weight||0, note;
+  // Set progression: only accumulate within the same meso; new meso resets to 3.
+  if (lp.sameMeso){
+    sets = Math.min(6, Math.max(2, sets + feedbackAdj(lp.perf.log.feedback)));
+  } else {
+    sets = 3;
+  }
+  // Load/rep progression
+  if (weight>0){
+    if (reps>=10){ weight = roundTo5(weight*1.05); reps = Math.max(6, reps-3);
+      note='Hit top of rep range last time ('+e.weight+'×'+e.reps+') — add load, drop reps.'; }
+    else { reps = reps+1;
+      note='Last: '+e.weight+' lb × '+e.reps+'. Same weight, +1 rep per set.'; }
+  } else {
+    reps = reps+2;
+    note='Last: '+e.reps+' reps/set. Bodyweight — add 2 reps per set.';
+  }
+  note += ' Train to '+rirLabel(cw)+'.';
+  return {sets:sets, reps:reps, weight:weight, note:note};
+}
+
+/* ---------- 5-day split: Upper / Lower / Stairs / Upper / Lower ---------- */
+var WORKOUT_DAYS = {
+  d1:{name:'Day 1 — Upper Body A', ex:[
+    {n:'Pull-ups', m:'Back'},
+    {n:'Bench press', m:'Chest'},
+    {n:'Overhead press', m:'Shoulders'},
+    {n:'Push-ups', m:'Chest'},
+    {n:'Hanging leg raises', m:'Core'}]},
+  d2:{name:'Day 2 — Lower Body A', ex:[
+    {n:'Back squat', m:'Quads'},
+    {n:'Romanian deadlift', m:'Hamstrings'},
+    {n:'Walking lunges', m:'Quads'},
+    {n:'Weighted sit-ups', m:'Core'},
+    {n:'Flutter kicks (4-ct)', m:'Core'}]},
+  d4:{name:'Day 4 — Upper Body B', ex:[
+    {n:'Barbell row', m:'Back'},
+    {n:'Dips', m:'Chest'},
+    {n:'Push-ups', m:'Chest'},
+    {n:'Russian twists', m:'Core'},
+    {n:'Plank (sec)', m:'Core'}]},
+  d5:{name:'Day 5 — Lower Body B', ex:[
+    {n:'Deadlift', m:'Hamstrings'},
+    {n:'Front squat', m:'Quads'},
+    {n:'Calf raises', m:'Calves'},
+    {n:'Sit-ups', m:'Core'},
+    {n:'V-ups', m:'Core'}]}
+};
+var currentDay = 'd1';
+
+/* ---------- workout view ---------- */
+document.querySelectorAll('#dayPick button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#dayPick button').forEach(function(x){x.classList.remove('active');});
+    b.classList.add('active');
+    currentDay = b.dataset.day;
+    renderWorkout();
+  });
+});
+
+function exCard(name, muscle, r){
+  var rows = '';
+  var n = r.sets || 3;
+  for (var i=0;i<n;i++){
+    rows += '<div class="setrow">'+
+      '<input type="number" class="wt" placeholder="lb" value="'+(r.weight||'')+'">'+
+      '<input type="number" class="rp" placeholder="reps" value="'+(r.reps||'')+'">'+
+      '<input type="checkbox" class="ck"></div>';
+  }
+  return '<div class="card excard" data-ex="'+name+'">'+
+    '<span class="chip">'+muscle.toUpperCase()+'</span>'+
+    '<h3>'+name+'</h3>'+
+    '<div class="reco">&#9654; '+r.note+'</div>'+
+    '<div class="sethead"><span>Weight</span><span>Reps</span><span>Log</span></div>'+
+    rows+
+    '<button class="addset" onclick="addSet(this)">+ Add Set</button>'+
+    '</div>';
+}
+function addSet(btn){
+  var card = btn.closest('.excard');
+  var last = card.querySelectorAll('.setrow');
+  last = last[last.length-1];
+  var div = document.createElement('div');
+  div.className = 'setrow';
+  div.innerHTML = '<input type="number" class="wt" placeholder="lb" value="'+(last?last.querySelector('.wt').value:'')+'">'+
+    '<input type="number" class="rp" placeholder="reps" value="'+(last?last.querySelector('.rp').value:'')+'">'+
+    '<input type="checkbox" class="ck">';
+  card.insertBefore(div, btn);
+}
+function addCustomEx(){
+  var sel = document.getElementById('customExSel');
+  var name = sel.value;
+  var r = getRecommendation(name);
+  var tmp = document.createElement('div');
+  tmp.innerHTML = exCard(name, 'Custom', r);
+  document.getElementById('workoutArea').insertBefore(tmp.firstChild, document.getElementById('customAdd'));
+}
+
+function renderWorkout(){
+  var cw = currentWeek();
+  var area = document.getElementById('workoutArea');
+  document.getElementById('woTitle').innerHTML = 'WEEK '+cw+' <span>'+
+    (currentDay==='stairs' ? 'DAY 3' : 'DAY '+currentDay.slice(1))+'</span>';
+  document.getElementById('rirBanner').innerHTML =
+    'Meso '+mesoOf(cw)+' &middot; Week '+mesoWeekOf(cw)+' of 6 &mdash; <b>'+rirLabel(cw)+'</b>';
+
+  if (currentDay==='stairs'){
+    var p = programWeek(cw);
+    document.getElementById('woSub').textContent = 'Day 3 — StairMaster Floor Climb';
+    area.innerHTML = '<div class="card excard">'+
+      '<span class="chip">CARDIO</span><h3>StairMaster</h3>'+
+      '<div class="reco">&#9654; Target: '+p.floorsPerSession+' floors'+
+      (p.vest?' @ '+p.vest+' lb vest':'')+(p.deload?' (deload — easy pace)':'')+'</div>'+
+      '<label>Floors Climbed</label><input type="number" id="floors" placeholder="e.g. '+p.floorsPerSession+'">'+
+      '<label>Duration (min)</label><input type="number" id="minutes" placeholder="e.g. 30">'+
+      '<label>Weight Vest / Pack (lb)</label><input type="number" id="vest" value="'+p.vest+'">'+
+      '</div>';
+    document.getElementById('fbRow').classList.add('hidden');
+  } else {
+    var day = WORKOUT_DAYS[currentDay];
+    document.getElementById('woSub').textContent = day.name;
+    var h = '';
+    day.ex.forEach(function(e){
+      h += exCard(e.n, e.m, getRecommendation(e.n));
+    });
+    h += '<div class="card" id="customAdd"><h2>Add Exercise</h2><div class="row">'+
+      '<div><select id="customExSel">'+CORE_EX.map(function(e){return '<option>'+e+'</option>';}).join('')+'</select></div>'+
+      '<div style="flex:0 0 auto"><button class="btn small secondary" onclick="addCustomEx()">+ Add</button></div>'+
+      '</div></div>';
+    area.innerHTML = h;
+    document.getElementById('fbRow').classList.remove('hidden');
+  }
+}
+
+function finishWorkout(){
+  var log = {
+    id: Date.now(),
+    date: document.getElementById('logDate').value || todayStr(),
+    notes: document.getElementById('logNotes').value.trim()
+  };
+  if (currentDay==='stairs'){
+    log.type = 'stairs';
+    log.floors = parseInt(document.getElementById('floors').value)||0;
+    log.minutes = parseInt(document.getElementById('minutes').value)||0;
+    log.vest = parseInt(document.getElementById('vest').value)||0;
+    if (!log.floors){ alert('Enter floors climbed.'); return; }
+  } else {
+    log.type = 'strength';
+    log.day = currentDay;
+    log.exercises = [];
+    document.querySelectorAll('#workoutArea .excard[data-ex]').forEach(function(card){
+      var name = card.dataset.ex;
+      var done = [], setDetails = [];
+      card.querySelectorAll('.setrow').forEach(function(r){
+        if (r.querySelector('.ck').checked){
+          var w = parseInt(r.querySelector('.wt').value)||0;
+          var rp = parseInt(r.querySelector('.rp').value)||0;
+          if (rp){ done.push({w:w,r:rp}); setDetails.push({weight:w,reps:rp}); }
+        }
+      });
+      if (done.length){
+        log.exercises.push({
+          name: name,
+          sets: done.length,
+          reps: Math.max.apply(null, done.map(function(s){return s.r;})),
+          weight: Math.max.apply(null, done.map(function(s){return s.w;})),
+          setDetails: setDetails
+        });
+      }
+    });
+    if (!log.exercises.length){ alert('Check off at least one set (tap the green box as you finish each set).'); return; }
+    log.feedback = {
+      pump: parseInt(document.getElementById('fbPump').value),
+      soreness: parseInt(document.getElementById('fbSore').value),
+      difficulty: parseInt(document.getElementById('fbDiff').value)
+    };
+  }
+  state.logs.push(log);
+  state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
+  persist();
+  sbSaveLog(log);
+  document.getElementById('logNotes').value='';
+  alert('Workout saved. Hooyah!');
+  renderWorkout();
+  renderPlan();
+}
+
+/* ---------- history ---------- */
+function renderHistory(){
+  var el = document.getElementById('histList');
+  if (!state.logs.length){ el.innerHTML = '<div class="empty">No workouts logged yet. Get after it.</div>'; return; }
+  el.innerHTML = state.logs.slice().reverse().map(function(l){
+    var detail = l.type==='stairs'
+      ? '<b>'+l.floors+' floors</b>'+(l.minutes?' in '+l.minutes+' min':'')+(l.vest?' @ '+l.vest+' lb vest':'')
+      : l.exercises.map(function(e){
+          if (e.setDetails) return e.name+': '+e.setDetails.map(function(s){
+            return (s.weight?s.weight+'×':'')+s.reps;
+          }).join(', ');
+          return e.name+' '+e.sets+'×'+e.reps+(e.weight?' @ '+e.weight+' lb':'');
+        }).join('<br>');
+    return '<div class="histitem">'+
+      '<div class="top"><span class="date">'+l.date+'</span>'+
+      '<span class="tag '+l.type+'">'+(l.type==='stairs'?'Stairs':'Strength')+'</span></div>'+
+      '<div class="detail">'+detail+(l.notes?'<br><i style="color:var(--muted)">'+l.notes+'</i>':'')+'</div>'+
+      '<button class="rm" onclick="removeLog('+l.id+')">Remove</button></div>';
+  }).join('');
+}
+function removeLog(id){
+  if (!confirm('Delete this workout?')) return;
+  state.logs = state.logs.filter(function(l){return l.id!==id;});
+  persist(); sbDeleteLog(id); renderHistory(); renderPlan();
+}
+
+/* ---------- progress ---------- */
+function renderProgress(){
+  var stairs = state.logs.filter(function(l){return l.type==='stairs';});
+  var totalFloors = stairs.reduce(function(a,l){return a+(l.floors||0);},0);
+  document.getElementById('statFloors').textContent = totalFloors;
+  document.getElementById('statSessions').textContent = state.logs.length;
+
+  // streak: consecutive weeks (ending current) with >=1 workout
+  var streak = 0;
+  for (var w=currentWeek(); w>=1; w--){
+    if (logsInWeek(w).length) streak++; else break;
+  }
+  document.getElementById('statStreak').textContent = streak;
+
+  drawLine('chartFloors',
+    stairs.map(function(l){return l.floors;}),
+    stairs.map(function(l){return l.date.slice(5);}));
+
+  var vols=[], labels=[];
+  for (var i=1;i<=currentWeek();i++){
+    var v = logsInWeek(i).filter(function(l){return l.type==='strength';})
+      .reduce(function(a,l){ return a + l.exercises.reduce(function(x,e){return x+e.sets*e.reps;},0); },0);
+    vols.push(v); labels.push('W'+i);
+  }
+  drawBars('chartVolume', vols, labels);
+
+  document.getElementById('storageNote').textContent = storageOK
+    ? 'Data is saved automatically in this browser. Export a backup periodically.'
+    : 'Warning: browser storage unavailable — data lives only until you close the page. Use Export to save your log.';
+}
+
+function prepCanvas(id){
+  var c = document.getElementById(id);
+  var dpr = window.devicePixelRatio||1;
+  var w = c.clientWidth, h = 200;
+  c.width = w*dpr; c.height = h*dpr;
+  var ctx = c.getContext('2d');
+  ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  return {ctx:ctx,w:w,h:h};
+}
+function drawLine(id,data,labels){
+  var p = prepCanvas(id), ctx=p.ctx;
+  if (!data.length){ emptyChart(ctx,p); return; }
+  var pad={l:34,r:10,t:14,b:24};
+  var max = Math.max.apply(null,data)*1.15||10;
+  var xw = (p.w-pad.l-pad.r)/Math.max(data.length-1,1);
+  ctx.strokeStyle='#243140'; ctx.fillStyle='#8fa3b5'; ctx.font='10px sans-serif';
+  for (var g=0; g<=4; g++){
+    var y = pad.t+(p.h-pad.t-pad.b)*g/4;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(p.w-pad.r,y); ctx.stroke();
+    ctx.fillText(Math.round(max*(1-g/4)), 4, y+3);
+  }
+  ctx.strokeStyle='#3fa7d6'; ctx.lineWidth=2; ctx.beginPath();
+  data.forEach(function(v,i){
+    var x = pad.l+xw*i, y = pad.t+(p.h-pad.t-pad.b)*(1-v/max);
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.stroke();
+  ctx.fillStyle='#d4a017';
+  data.forEach(function(v,i){
+    var x = pad.l+xw*i, y = pad.t+(p.h-pad.t-pad.b)*(1-v/max);
+    ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
+  });
+  ctx.fillStyle='#8fa3b5';
+  var step = Math.ceil(labels.length/6);
+  labels.forEach(function(l,i){
+    if (i%step===0) ctx.fillText(l, pad.l+xw*i-12, p.h-8);
+  });
+}
+function drawBars(id,data,labels){
+  var p = prepCanvas(id), ctx=p.ctx;
+  if (!data.some(function(v){return v>0;})){ emptyChart(ctx,p); return; }
+  var pad={l:34,r:10,t:14,b:24};
+  var max = Math.max.apply(null,data)*1.15||10;
+  var bw = (p.w-pad.l-pad.r)/data.length;
+  ctx.strokeStyle='#243140'; ctx.fillStyle='#8fa3b5'; ctx.font='10px sans-serif';
+  for (var g=0; g<=4; g++){
+    var y = pad.t+(p.h-pad.t-pad.b)*g/4;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(p.w-pad.r,y); ctx.stroke();
+    ctx.fillText(Math.round(max*(1-g/4)), 4, y+3);
+  }
+  data.forEach(function(v,i){
+    var h = (p.h-pad.t-pad.b)*(v/max);
+    ctx.fillStyle='#d4a017';
+    ctx.fillRect(pad.l+bw*i+3, p.h-pad.b-h, bw-6, h);
+    ctx.fillStyle='#8fa3b5';
+    ctx.fillText(labels[i], pad.l+bw*i+bw/2-8, p.h-8);
+  });
+}
+function emptyChart(ctx,p){
+  ctx.fillStyle='#8fa3b5'; ctx.font='13px sans-serif'; ctx.textAlign='center';
+  ctx.fillText('No data yet — log a workout to see progress.', p.w/2, p.h/2);
+  ctx.textAlign='left';
+}
+
+/* ---------- supabase cloud sync ---------- */
+var sbClient = null;
+var SB_DEFAULT = {
+  url: 'https://wtgsxzznpxexlpzsgiml.supabase.co',
+  key: 'sb_publishable_8g7vEi7ndEyrFHT2fooZ2A_0vX8cAoB'
+};
+var sbCfg = null;
+try { sbCfg = JSON.parse(localStorage.getItem('tridentSb')||'null'); } catch(e){}
+if (!sbCfg) sbCfg = SB_DEFAULT;
+
+function sbStatus(msg, ok){
+  var el = document.getElementById('sbStatus');
+  if (el){ el.textContent = msg; el.style.color = ok ? 'var(--green)' : 'var(--muted)'; }
+}
+function connectSupabase(){
+  var url = document.getElementById('sbUrl').value.trim();
+  var key = document.getElementById('sbKey').value.trim();
+  if (!url || !key){ alert('Enter both the Project URL and anon key.'); return; }
+  if (url.indexOf('http')!==0) url = 'https://'+url;
+  sbCfg = {url:url, key:key};
+  try{ localStorage.setItem('tridentSb', JSON.stringify(sbCfg)); }catch(e){}
+  initSupabase();
+}
+async function initSupabase(){
+  if (!sbCfg) return;
+  if (!window.supabase){ sbStatus('Supabase library did not load — check your internet connection.', false); return; }
+  try{
+    sbClient = window.supabase.createClient(sbCfg.url, sbCfg.key);
+    sbStatus('Connecting…', false);
+    // Push any local workouts up first (merge), then pull the full cloud copy.
+    if (state.logs.length){
+      var up = await sbClient.from('workouts').upsert(state.logs.map(function(l){
+        return {id:l.id, date:l.date, type:l.type, data:l};
+      }));
+      if (up.error) throw up.error;
+    }
+    var res = await sbClient.from('workouts').select('*').order('date');
+    if (res.error) throw res.error;
+    state.logs = res.data.map(function(r){ return r.data; });
+    state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
+    var s = await sbClient.from('settings').select('*').eq('key','startDate').maybeSingle();
+    if (s.data && s.data.value && s.data.value.v){ state.startDate = s.data.value.v; }
+    else { await sbClient.from('settings').upsert({key:'startDate', value:{v:state.startDate}}); }
+    persist();
+    sbStatus('Connected — '+state.logs.length+' workouts in the cloud.', true);
+    viewWeek = null; renderPlan(); renderWorkout();
+  }catch(e){
+    sbClient = null;
+    sbStatus('Connection failed: '+(e.message||e)+' — running on local storage.', false);
+  }
+}
+function sbSaveLog(log){
+  if (!sbClient) return;
+  sbClient.from('workouts').upsert({id:log.id, date:log.date, type:log.type, data:log})
+    .then(function(r){ if (r.error) sbStatus('Sync error: '+r.error.message, false); });
+}
+function sbDeleteLog(id){
+  if (!sbClient) return;
+  sbClient.from('workouts').delete().eq('id', id)
+    .then(function(r){ if (r.error) sbStatus('Sync error: '+r.error.message, false); });
+}
+function sbSaveStart(){
+  if (!sbClient) return;
+  sbClient.from('settings').upsert({key:'startDate', value:{v:state.startDate}}).then(function(){});
+}
+
+/* ---------- export / import ---------- */
+function exportData(){
+  var blob = new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'trident-trainer-backup.json';
+  a.click();
+}
+function importData(ev){
+  var f = ev.target.files[0]; if(!f) return;
+  var r = new FileReader();
+  r.onload = function(){
+    try{
+      var d = JSON.parse(r.result);
+      if (!d.logs || !d.startDate) throw new Error('bad file');
+      state = d; persist(); renderPlan(); initSupabase(); alert('Data imported.');
+    }catch(e){ alert('Invalid backup file.'); }
+  };
+  r.readAsText(f);
+}
+
+/* ---------- init ---------- */
+document.getElementById('logDate').value = todayStr();
+if (sbCfg){
+  document.getElementById('sbUrl').value = sbCfg.url;
+  document.getElementById('sbKey').value = sbCfg.key;
+  initSupabase();
+}
+renderWorkout();
+renderPlan();
+</script>
+</body>
+</html>
