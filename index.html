@@ -54,6 +54,7 @@
   .cmptext{font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5;}
   .cmptext b{color:var(--green);}
   .gold{color:var(--accent);}
+  .savestatus{font-size:12px; color:var(--green); margin-top:8px; min-height:15px;}
   .rirbanner{margin-top:12px; padding:10px 12px; background:rgba(212,160,23,.08); border:1px solid var(--accent); border-radius:8px; font-size:13px; color:var(--text);}
   .wohead{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
   .wotitle{font-size:22px; font-weight:800; letter-spacing:1px;}
@@ -173,6 +174,7 @@
       <button data-day="s2">D4<br>Stairs</button>
     </div>
     <div class="rirbanner" id="rirBanner"></div>
+    <div class="savestatus" id="saveStatus"></div>
   </div>
 
   <div id="workoutArea"></div>
@@ -709,56 +711,135 @@ function renderWorkout(){
     area.innerHTML = h;
     document.getElementById('fbRow').classList.remove('hidden');
   }
+  restoreDraft();
 }
 
-function finishWorkout(){
-  var log = {
-    id: Date.now(),
-    date: document.getElementById('logDate').value || todayStr(),
-    notes: document.getElementById('logNotes').value.trim()
-  };
-  if (isStairsDay(currentDay)){
-    log.type = 'stairs';
-    log.floors = parseInt(document.getElementById('floors').value)||0;
-    log.minutes = parseInt(document.getElementById('minutes').value)||0;
-    log.vest = parseInt(document.getElementById('vest').value)||0;
-    if (!log.floors){ alert('Enter floors climbed.'); return; }
-  } else {
-    log.type = 'strength';
-    log.day = currentDay;
-    log.exercises = [];
-    document.querySelectorAll('#workoutArea .excard[data-ex]').forEach(function(card){
-      var name = card.dataset.ex;
-      var done = [], setDetails = [];
-      card.querySelectorAll('.setrow').forEach(function(r){
-        if (r.querySelector('.ck').checked){
-          var w = parseInt(r.querySelector('.wt').value)||0;
-          var rp = parseInt(r.querySelector('.rp').value)||0;
-          if (rp){ done.push({w:w,r:rp}); setDetails.push({weight:w,reps:rp}); }
-        }
-      });
-      if (done.length){
-        log.exercises.push({
-          name: name,
-          sets: done.length,
-          reps: Math.max.apply(null, done.map(function(s){return s.r;})),
-          weight: Math.max.apply(null, done.map(function(s){return s.w;})),
-          setDetails: setDetails
-        });
+/* ---------- auto-save: every set saves the moment you log it ---------- */
+function findDraft(dateStr){
+  var type = isStairsDay(currentDay) ? 'stairs' : 'strength';
+  for (var i=state.logs.length-1; i>=0; i--){
+    var l = state.logs[i];
+    if (l.date===dateStr && l.type===type && l.day===currentDay) return l;
+  }
+  return null;
+}
+function collectStrength(){
+  var exs = [];
+  document.querySelectorAll('#workoutArea .excard[data-ex]').forEach(function(card){
+    var setDetails = [];
+    card.querySelectorAll('.setrow').forEach(function(r){
+      if (r.querySelector('.ck').checked){
+        var w = parseInt(r.querySelector('.wt').value)||0;
+        var rp = parseInt(r.querySelector('.rp').value)||0;
+        if (rp) setDetails.push({weight:w, reps:rp});
       }
     });
-    if (!log.exercises.length){ alert('Check off at least one set (tap the green box as you finish each set).'); return; }
-    log.feedback = {
+    if (setDetails.length){
+      exs.push({
+        name: card.dataset.ex,
+        sets: setDetails.length,
+        reps: Math.max.apply(null, setDetails.map(function(s){return s.reps;})),
+        weight: Math.max.apply(null, setDetails.map(function(s){return s.weight;})),
+        setDetails: setDetails
+      });
+    }
+  });
+  return exs;
+}
+function setSaveStatus(msg){
+  var el = document.getElementById('saveStatus');
+  if (el) el.textContent = msg;
+}
+function removeDraft(draft){
+  state.logs = state.logs.filter(function(l){ return l !== draft; });
+  persist(); sbDeleteLog(draft.id);
+  setSaveStatus('Draft cleared.');
+  renderPlan();
+}
+function autoSave(){
+  var date = document.getElementById('logDate').value || todayStr();
+  var draft = findDraft(date);
+  if (isStairsDay(currentDay)){
+    var fEl = document.getElementById('floors');
+    if (!fEl) return;
+    var floors = parseInt(fEl.value)||0;
+    if (!floors){ if (draft) removeDraft(draft); return; }
+    if (!draft){ draft = {id: Date.now(), date: date, type:'stairs', day: currentDay}; state.logs.push(draft); }
+    draft.floors = floors;
+    draft.minutes = parseInt(document.getElementById('minutes').value)||0;
+    draft.vest = parseInt(document.getElementById('vest').value)||0;
+  } else {
+    var exs = collectStrength();
+    if (!exs.length){ if (draft) removeDraft(draft); return; }
+    if (!draft){ draft = {id: Date.now(), date: date, type:'strength', day: currentDay}; state.logs.push(draft); }
+    draft.exercises = exs;
+  }
+  draft.notes = document.getElementById('logNotes').value.trim();
+  state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
+  persist();
+  sbSaveLog(draft);
+  var t = new Date();
+  setSaveStatus('Auto-saved '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0')+' ✓');
+  renderPlan();
+}
+function restoreDraft(){
+  var date = document.getElementById('logDate').value || todayStr();
+  var draft = findDraft(date);
+  setSaveStatus(draft ? 'Workout in progress — every set saves automatically. ✓'
+                      : 'Every set you check off saves automatically.');
+  if (!draft) return;
+  if (draft.type==='stairs'){
+    if (draft.floors) document.getElementById('floors').value = draft.floors;
+    if (draft.minutes) document.getElementById('minutes').value = draft.minutes;
+    document.getElementById('vest').value = draft.vest||0;
+  } else {
+    var area = document.getElementById('workoutArea');
+    (draft.exercises||[]).forEach(function(e){
+      var card = area.querySelector('.excard[data-ex="'+e.name+'"]');
+      if (!card){
+        var tmp = document.createElement('div');
+        tmp.innerHTML = exCard(e.name, 'Custom', getRecommendation(e.name));
+        area.insertBefore(tmp.firstChild, document.getElementById('customAdd'));
+        card = area.querySelector('.excard[data-ex="'+e.name+'"]');
+      }
+      if (!card) return;
+      var det = e.setDetails || [];
+      var rows = card.querySelectorAll('.setrow');
+      for (var i=rows.length; i<det.length; i++){ addSet(card.querySelector('.addset')); }
+      rows = card.querySelectorAll('.setrow');
+      det.forEach(function(s,i){
+        if (!rows[i]) return;
+        rows[i].querySelector('.wt').value = s.weight||'';
+        rows[i].querySelector('.rp').value = s.reps||'';
+        rows[i].querySelector('.ck').checked = true;
+      });
+    });
+    if (draft.feedback){
+      document.getElementById('fbPump').value = draft.feedback.pump;
+      document.getElementById('fbSore').value = draft.feedback.soreness;
+      document.getElementById('fbDiff').value = draft.feedback.difficulty;
+    }
+  }
+  document.getElementById('logNotes').value = draft.notes||'';
+}
+function finishWorkout(){
+  autoSave();
+  var date = document.getElementById('logDate').value || todayStr();
+  var draft = findDraft(date);
+  if (!draft){
+    alert(isStairsDay(currentDay) ? 'Enter floors climbed first.'
+      : 'Check off at least one set first (tap the green box as you finish each set).');
+    return;
+  }
+  if (draft.type==='strength'){
+    draft.feedback = {
       pump: parseInt(document.getElementById('fbPump').value),
       soreness: parseInt(document.getElementById('fbSore').value),
       difficulty: parseInt(document.getElementById('fbDiff').value)
     };
   }
-  state.logs.push(log);
-  state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
   persist();
-  sbSaveLog(log);
-  document.getElementById('logNotes').value='';
+  sbSaveLog(draft);
   alert('Workout saved. Hooyah!');
   renderWorkout();
   renderPlan();
@@ -985,6 +1066,12 @@ function importData(ev){
 
 /* ---------- init ---------- */
 document.getElementById('logDate').value = todayStr();
+var autoSaveTimer = null;
+function queueAutoSave(){ clearTimeout(autoSaveTimer); autoSaveTimer = setTimeout(autoSave, 500); }
+document.getElementById('workoutArea').addEventListener('change', queueAutoSave);
+document.getElementById('workoutArea').addEventListener('input', queueAutoSave);
+document.getElementById('logNotes').addEventListener('input', queueAutoSave);
+document.getElementById('logDate').addEventListener('change', function(){ renderWorkout(); });
 if (sbCfg){
   document.getElementById('sbUrl').value = sbCfg.url;
   document.getElementById('sbKey').value = sbCfg.key;
