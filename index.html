@@ -46,6 +46,14 @@
   .howto{font-size:12.5px; color:var(--muted); margin:6px 0 2px; line-height:1.5;}
   .howto a{color:var(--accent); text-decoration:none; white-space:nowrap;}
   .howto a:hover{text-decoration:underline;}
+  .cmp{margin:10px 0 4px;}
+  .cmpbar{position:relative; height:8px; background:var(--panel2); border-radius:4px;}
+  .cmpfill{height:100%; background:var(--green); border-radius:4px; transition:width .3s;}
+  .cmptick{position:absolute; top:-3px; width:2px; height:14px; background:var(--muted);}
+  .cmptick.gold{background:var(--accent);}
+  .cmptext{font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.5;}
+  .cmptext b{color:var(--green);}
+  .gold{color:var(--accent);}
   .rirbanner{margin-top:12px; padding:10px 12px; background:rgba(212,160,23,.08); border:1px solid var(--accent); border-radius:8px; font-size:13px; color:var(--text);}
   .wohead{display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px;}
   .wotitle{font-size:22px; font-weight:800; letter-spacing:1px;}
@@ -504,6 +512,66 @@ function exDemoLink(name){
   return 'https://www.youtube.com/results?search_query=' + encodeURIComponent(q);
 }
 
+/* ---------- benchmarks: average guy vs SEAL standard ---------- */
+/* PST numbers from official SEAL screening standards; averages from population fitness data.
+   Barbell lifts have no SEAL standard, so they compare against lifter strength levels (×bodyweight). */
+var BENCHMARKS = {
+  'Pull-ups':             {avg:2,   top:18,  aL:'Avg man', tL:'SEAL competitive', extra:'PST min: 10'},
+  'Push-ups':             {avg:20,  top:90,  aL:'Avg man', tL:'SEAL competitive', extra:'PST min: 42 in 2 min'},
+  'Sit-ups':              {avg:25,  top:90,  aL:'Avg man', tL:'SEAL competitive', extra:'PST min: 50 in 2 min'},
+  'Weighted sit-ups':     {avg:12,  top:40,  aL:'Avg man', tL:'SEAL-fit'},
+  'Plank (sec)':          {avg:60,  top:240, aL:'Avg man', tL:'SEAL-fit'},
+  'Flutter kicks (4-ct)': {avg:20,  top:100, aL:'Avg man', tL:'BUD/S pace'},
+  'Hanging leg raises':   {avg:4,   top:15,  aL:'Avg man', tL:'SEAL-fit'},
+  'V-ups':                {avg:10,  top:40,  aL:'Avg man', tL:'SEAL-fit'},
+  'Dips':                 {avg:3,   top:20,  aL:'Avg man', tL:'SEAL-fit'},
+  'Russian twists':       {avg:20,  top:60,  aL:'Avg man', tL:'SEAL-fit'},
+  'Bench press':          {ratio:true, avg:0.75, top:1.5,  aL:'Avg lifter', tL:'Advanced'},
+  'Overhead press':       {ratio:true, avg:0.5,  top:1.0,  aL:'Avg lifter', tL:'Advanced'},
+  'Barbell row':          {ratio:true, avg:0.7,  top:1.25, aL:'Avg lifter', tL:'Advanced'}
+};
+function bestPerformance(name, ratio){
+  var best = 0;
+  state.logs.forEach(function(l){
+    if (l.type!=='strength') return;
+    (l.exercises||[]).forEach(function(e){
+      if (e.name!==name) return;
+      if (ratio){ if (e.weight>best) best = e.weight; }
+      else if (e.setDetails){ e.setDetails.forEach(function(s){ if (s.reps>best) best = s.reps; }); }
+      else if (e.reps>best){ best = e.reps; }
+    });
+  });
+  return best;
+}
+function benchmarkHTML(name){
+  var b = BENCHMARKS[name]; if (!b) return '';
+  var you = bestPerformance(name, !!b.ratio);
+  var youVal, youTxt, unit;
+  if (b.ratio){
+    var bw = currentBodyweight();
+    if (!bw) return '<div class="cmptext">Log your body weight (Plan tab) to unlock strength comparisons.</div>';
+    youVal = you ? you/bw : 0;
+    youTxt = you ? you+' lb ('+youVal.toFixed(2)+'×BW)' : 'no data yet';
+    unit = '×BW';
+  } else {
+    youVal = you || 0;
+    unit = (name==='Plank (sec)') ? ' sec' : ' reps';
+    youTxt = you ? you+unit : 'no data yet';
+  }
+  var max = b.top*1.2;
+  function pct(v){ return Math.min(100, Math.round(v/max*100)); }
+  return '<div class="cmp">'+
+    '<div class="cmpbar">'+
+      '<div class="cmpfill" style="width:'+pct(youVal)+'%"></div>'+
+      '<span class="cmptick" style="left:'+pct(b.avg)+'%"></span>'+
+      '<span class="cmptick gold" style="left:'+pct(b.top)+'%"></span>'+
+    '</div>'+
+    '<div class="cmptext">You (best set): <b>'+youTxt+'</b> &middot; '+b.aL+': '+b.avg+unit+
+    ' &middot; <span class="gold">'+b.tL+': '+b.top+unit+'</span>'+
+    (b.extra ? ' &middot; '+b.extra : '')+'</div>'+
+    '</div>';
+}
+
 /* ---------- body weight tracking ---------- */
 var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups'];
 function isBW(name){ return BW_EX.indexOf(name) !== -1; }
@@ -579,6 +647,7 @@ function exCard(name, muscle, r){
     '<span class="chip">'+muscle.toUpperCase()+'</span>'+
     '<h3>'+name+'</h3>'+
     info+
+    benchmarkHTML(name)+
     '<div class="reco">&#9654; '+r.note+'</div>'+
     '<div class="sethead"><span>Weight</span><span>Reps</span><span>Log</span></div>'+
     rows+
