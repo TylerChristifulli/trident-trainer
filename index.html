@@ -744,16 +744,26 @@ function renderWorkout(){
   if (isStairsDay(currentDay)){
     var p = programWeek(cw);
     document.getElementById('woSub').textContent = (currentDay==='s1'?'Day 2':'Day 4')+' — StairMaster Floor Climb';
-    area.innerHTML = '<div class="card excard">'+
-      '<span class="chip">CARDIO</span><h3>StairMaster</h3>'+
-      '<div class="howto">Stay upright — hands resting light, not gripping the rails. Full steps, steady pace you can hold the whole session. '+
-      '<a href="https://www.youtube.com/results?search_query=stairmaster+technique+tips" target="_blank" rel="noopener">Watch demo &#9654;</a></div>'+
-      '<div class="reco">&#9654; Target: '+p.floorsPerSession+' floors'+
-      (p.vest?' @ '+p.vest+' lb vest':'')+(p.deload?' (deload — easy pace)':'')+'</div>'+
-      '<label>Floors Climbed</label><input type="number" id="floors" placeholder="e.g. '+p.floorsPerSession+'">'+
-      '<label>Duration (min)</label><input type="number" id="minutes" placeholder="e.g. 30">'+
-      '<label>Weight Vest / Pack (lb)</label><input type="number" id="vest" value="'+p.vest+'">'+
-      '</div>';
+    var half = Math.round(p.floorsPerSession/2);
+    function stairsCard(i){
+      return '<div class="card excard stairsess" data-sess="'+i+'">'+
+        '<span class="chip">CARDIO</span><h3>StairMaster — Session '+(i+1)+'</h3>'+
+        (i===0
+          ? '<div class="howto">Stay upright — hands resting light, not gripping the rails. Full steps, steady pace. '+
+            '<a href="https://www.youtube.com/results?search_query=stairmaster+technique+tips" target="_blank" rel="noopener">Watch demo &#9654;</a></div>'
+          : '<div class="howto">Round two — take your break, then knock out the rest.</div>')+
+        '<div class="reco">&#9654; Suggested: ~'+half+' floors this session'+
+        (p.vest?' @ '+p.vest+' lb vest':'')+(p.deload?' (deload — easy pace)':'')+'</div>'+
+        '<label>Floors Climbed</label><input type="number" class="sfloors" placeholder="e.g. '+half+'">'+
+        '<label>Duration (min)</label><input type="number" class="smin" placeholder="e.g. 15">'+
+        '<label>Weight Vest / Pack (lb)</label><input type="number" class="svest" value="'+p.vest+'">'+
+        '</div>';
+    }
+    area.innerHTML =
+      '<div class="card"><h2>Today\'s Target</h2><div class="target"><span class="name">Total floors (both sessions)</span>'+
+      '<span class="val">'+p.floorsPerSession+(p.vest?' @ '+p.vest+' lb':'')+'</span></div>'+
+      '<p class="note">Split it however you like — go hard, take a short break, then finish the rest in Session 2.</p></div>'+
+      stairsCard(0) + stairsCard(1);
     document.getElementById('fbRow').classList.add('hidden');
   } else {
     var day = WORKOUT_DAYS[currentDay];
@@ -818,14 +828,22 @@ function autoSave(){
   var date = document.getElementById('logDate').value || todayStr();
   var draft = findDraft(date);
   if (isStairsDay(currentDay)){
-    var fEl = document.getElementById('floors');
-    if (!fEl) return;
-    var floors = parseInt(fEl.value)||0;
-    if (!floors){ if (draft) removeDraft(draft); return; }
+    var cards = document.querySelectorAll('#workoutArea .stairsess');
+    if (!cards.length) return;
+    var sessions = [], totF = 0, totM = 0, maxV = 0;
+    cards.forEach(function(c){
+      var f = parseInt(c.querySelector('.sfloors').value)||0;
+      var m = parseInt(c.querySelector('.smin').value)||0;
+      var v = parseInt(c.querySelector('.svest').value)||0;
+      sessions.push({floors:f, minutes:m, vest:v});
+      totF += f; totM += m; if (v>maxV) maxV = v;
+    });
+    if (!totF){ if (draft) removeDraft(draft); return; }
     if (!draft){ draft = {id: Date.now(), date: date, type:'stairs', day: currentDay}; state.logs.push(draft); }
-    draft.floors = floors;
-    draft.minutes = parseInt(document.getElementById('minutes').value)||0;
-    draft.vest = parseInt(document.getElementById('vest').value)||0;
+    draft.floors = totF;
+    draft.minutes = totM;
+    draft.vest = maxV;
+    draft.sessions = sessions;
   } else {
     var exs = collectStrength();
     if (!exs.length){ if (draft) removeDraft(draft); return; }
@@ -848,9 +866,14 @@ function restoreDraft(){
                       : 'Every set you check off saves automatically.');
   if (!draft) return;
   if (draft.type==='stairs'){
-    if (draft.floors) document.getElementById('floors').value = draft.floors;
-    if (draft.minutes) document.getElementById('minutes').value = draft.minutes;
-    document.getElementById('vest').value = draft.vest||0;
+    var cards = document.querySelectorAll('#workoutArea .stairsess');
+    var sess = draft.sessions || [{floors:draft.floors, minutes:draft.minutes, vest:draft.vest}];
+    cards.forEach(function(c, i){
+      var s = sess[i]; if (!s) return;
+      if (s.floors) c.querySelector('.sfloors').value = s.floors;
+      if (s.minutes) c.querySelector('.smin').value = s.minutes;
+      c.querySelector('.svest').value = s.vest||0;
+    });
   } else {
     var area = document.getElementById('workoutArea');
     (draft.exercises||[]).forEach(function(e){
@@ -918,9 +941,15 @@ function showHooyah(log){
   if (log.type==='stairs'){
     var p = programWeek(currentWeek());
     var pctT = Math.min(100, Math.round((log.floors/p.floorsPerSession)*100));
+    var br = '';
+    if (log.sessions && log.sessions.filter(function(s){return s.floors;}).length > 1){
+      br = log.sessions.map(function(s,i){
+        return 'S'+(i+1)+': '+s.floors+' floors'+(s.minutes?' / '+s.minutes+' min':'');
+      }).join(' &middot; ')+'<br>';
+    }
     rows = '<div class="hyrow"><div class="hyname">StairMaster'+(log.floors>=p.floorsPerSession?' <span class="pbtag">TARGET HIT</span>':'')+'</div>'+
       '<div class="cmpbar"><div class="cmpfill hyfill" data-w="'+Math.min(100,pctT)+'" style="width:0%"></div></div>'+
-      '<div class="hytext">'+log.floors+' floors'+(log.vest?' @ '+log.vest+' lb vest':'')+' &middot; '+pctT+'% of today\'s '+p.floorsPerSession+'-floor target</div></div>';
+      '<div class="hytext">'+br+log.floors+' total floors'+(log.vest?' @ '+log.vest+' lb vest':'')+' &middot; '+pctT+'% of today\'s '+p.floorsPerSession+'-floor target</div></div>';
   } else {
     (log.exercises||[]).forEach(function(e){
       var b = BENCHMARKS[e.name]; if (!b) return;
@@ -985,8 +1014,11 @@ function renderHistory(){
   var el = document.getElementById('histList');
   if (!state.logs.length){ el.innerHTML = '<div class="empty">No workouts logged yet. Get after it.</div>'; return; }
   el.innerHTML = state.logs.slice().reverse().map(function(l){
+    var stairsBr = (l.type==='stairs' && l.sessions && l.sessions.filter(function(s){return s.floors;}).length>1)
+      ? '<br>'+l.sessions.map(function(s,i){ return 'Session '+(i+1)+': '+s.floors+' floors'+(s.minutes?' in '+s.minutes+' min':''); }).join('<br>')
+      : '';
     var detail = l.type==='stairs'
-      ? '<b>'+l.floors+' floors</b>'+(l.minutes?' in '+l.minutes+' min':'')+(l.vest?' @ '+l.vest+' lb vest':'')
+      ? '<b>'+l.floors+' floors total</b>'+(l.minutes?' in '+l.minutes+' min':'')+(l.vest?' @ '+l.vest+' lb vest':'')+stairsBr
       : l.exercises.map(function(e){
           if (e.setDetails) return e.name+': '+e.setDetails.map(function(s){
             return (s.weight?s.weight+'×':'')+s.reps;
