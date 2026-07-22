@@ -83,8 +83,25 @@
   .daypick button.active{border-color:var(--accent); color:var(--accent); font-weight:700;}
   .excard h3{font-size:19px; font-weight:800; margin:6px 0 0;}
   .chip{display:inline-block; font-size:11px; font-weight:700; letter-spacing:1.5px; padding:4px 12px; border-radius:8px; background:rgba(76,175,125,.15); color:var(--green);}
-  .sethead{display:grid; grid-template-columns:1fr 1fr 64px; gap:10px; margin-top:12px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; text-align:center;}
-  .setrow{display:grid; grid-template-columns:1fr 1fr 64px; gap:10px; margin-top:8px; align-items:center;}
+  .sethead{display:grid; grid-template-columns:1fr 1fr 52px 26px; gap:10px; margin-top:12px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; text-align:center;}
+  .setrow{display:grid; grid-template-columns:1fr 1fr 52px 26px; gap:10px; margin-top:8px; align-items:center;}
+  .sdel{background:none; border:none; color:var(--red); font-size:20px; cursor:pointer; padding:0; line-height:1; opacity:.7;}
+  .sdel:hover{opacity:1;}
+  .exhead{display:flex; justify-content:space-between; align-items:center; gap:10px; margin-top:6px;}
+  .exhead h3{margin:0;}
+  .histbtn{background:var(--panel2); border:1px solid var(--border); color:var(--accent2); border-radius:6px; padding:5px 11px; font-size:12px; cursor:pointer; white-space:nowrap;}
+  #exhist{position:fixed; inset:0; z-index:250; background:rgba(8,12,17,.85); display:none; align-items:center; justify-content:center; padding:20px;}
+  #exhist.show{display:flex; animation:hyFade .2s;}
+  .ehbox{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:20px; width:100%; max-width:440px;}
+  .ehbox h3{margin-bottom:12px; font-size:18px;}
+  .ehbox .btn{margin-top:16px;}
+  .ehrow{display:flex; justify-content:space-between; gap:14px; padding:9px 0; border-bottom:1px solid var(--border); font-size:14px;}
+  .ehrow:last-child{border-bottom:none;}
+  .ehdate{color:var(--muted); white-space:nowrap;}
+  #toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(90px); max-width:88%; background:var(--panel); border:1px solid var(--accent); color:var(--text); border-radius:10px; padding:12px 20px; font-size:14px; line-height:1.45; z-index:300; opacity:0; transition:all .3s; text-align:center; pointer-events:none; box-shadow:0 6px 24px rgba(0,0,0,.5);}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  #toast.warn{border-color:var(--red);}
+  #toast .qa{display:block; font-size:11px; color:var(--muted); margin-top:4px; letter-spacing:1px;}
   .setrow input[type=number]{text-align:center; font-size:17px; font-weight:700; padding:12px 6px;}
   .setrow input[type=checkbox]{appearance:none; -webkit-appearance:none; width:30px; height:30px; border:2px solid var(--green); border-radius:8px; background:none; cursor:pointer; justify-self:center; position:relative;}
   .setrow input[type=checkbox]:checked{background:var(--green);}
@@ -265,6 +282,15 @@
 </section>
 
 </main>
+
+<div id="exhist" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="ehbox">
+    <h3 id="ehTitle"></h3>
+    <div id="ehRows"></div>
+    <button class="btn secondary" onclick="document.getElementById('exhist').classList.remove('show')">Close</button>
+  </div>
+</div>
+<div id="toast"></div>
 
 <div id="hooyah" onclick="hideHooyah()">
   <div class="hymark">&#128305;</div>
@@ -691,39 +717,48 @@ function nextWorkoutDay(){
   return 'd1';
 }
 
+function setRowHTML(name, wtVal, rpVal){
+  var isTime = (name==='Plank (sec)');
+  return '<div class="setrow">'+
+    '<input type="number" class="wt" placeholder="lb" value="'+(wtVal||'')+'">'+
+    '<input type="number" class="rp" placeholder="'+(isTime?'sec':'reps')+'" value="'+(rpVal||'')+'">'+
+    '<input type="checkbox" class="ck">'+
+    '<button class="sdel" onclick="delSet(this)" title="Delete set">&times;</button>'+
+    '</div>';
+}
 function exCard(name, muscle, r){
   var rows = '';
   var n = r.sets || 3;
-  for (var i=0;i<n;i++){
-    rows += '<div class="setrow">'+
-      '<input type="number" class="wt" placeholder="lb" value="'+(r.weight||'')+'">'+
-      '<input type="number" class="rp" placeholder="reps" value="'+(r.reps||'')+'">'+
-      '<input type="checkbox" class="ck"></div>';
-  }
+  var isTime = (name==='Plank (sec)');
+  for (var i=0;i<n;i++){ rows += setRowHTML(name, r.weight, r.reps); }
   var info = EX_INFO[name] ? '<div class="howto">'+EX_INFO[name]+
     ' <a href="'+exDemoLink(name)+'" target="_blank" rel="noopener">Watch demo &#9654;</a></div>' : '';
   return '<div class="card excard" data-ex="'+name+'">'+
     '<span class="chip">'+muscle.toUpperCase()+'</span>'+
-    '<h3>'+name+'</h3>'+
+    '<div class="exhead"><h3>'+name+'</h3>'+
+    '<button class="histbtn" onclick="showExHistory(\''+name+'\')">&#8635; Last time</button></div>'+
     info+
     benchmarkHTML(name)+
     (r.target ? '<div class="tgtline">TARGET: '+r.target+'</div>' : '')+
     '<div class="reco">&#9654; '+r.note+'</div>'+
-    '<div class="sethead"><span>Weight</span><span>Reps</span><span>Log</span></div>'+
+    '<div class="sethead"><span>Weight</span><span>'+(isTime?'Seconds':'Reps')+'</span><span>Log</span><span></span></div>'+
     rows+
     '<button class="addset" onclick="addSet(this)">+ Add Set</button>'+
     '</div>';
 }
 function addSet(btn){
   var card = btn.closest('.excard');
-  var last = card.querySelectorAll('.setrow');
-  last = last[last.length-1];
-  var div = document.createElement('div');
-  div.className = 'setrow';
-  div.innerHTML = '<input type="number" class="wt" placeholder="lb" value="'+(last?last.querySelector('.wt').value:'')+'">'+
-    '<input type="number" class="rp" placeholder="reps" value="'+(last?last.querySelector('.rp').value:'')+'">'+
-    '<input type="checkbox" class="ck">';
-  card.insertBefore(div, btn);
+  var rows = card.querySelectorAll('.setrow');
+  var last = rows[rows.length-1];
+  var tmp = document.createElement('div');
+  tmp.innerHTML = setRowHTML(card.dataset.ex,
+    last ? last.querySelector('.wt').value : '',
+    last ? last.querySelector('.rp').value : '');
+  card.insertBefore(tmp.firstChild, btn);
+}
+function delSet(btn){
+  btn.closest('.setrow').remove();
+  queueAutoSave();
 }
 function addCustomEx(){
   var sel = document.getElementById('customExSel');
@@ -760,7 +795,9 @@ function renderWorkout(){
         '</div>';
     }
     area.innerHTML =
-      '<div class="card"><h2>Today\'s Target</h2><div class="target"><span class="name">Total floors (both sessions)</span>'+
+      '<div class="card"><div class="exhead"><h2 style="margin:0">Today\'s Target</h2>'+
+      '<button class="histbtn" onclick="showStairHistory()">&#8635; Last time</button></div>'+
+      '<div class="target"><span class="name">Total floors (both sessions)</span>'+
       '<span class="val">'+p.floorsPerSession+(p.vest?' @ '+p.vest+' lb':'')+'</span></div>'+
       '<p class="note">Split it however you like — go hard, take a short break, then finish the rest in Session 2.</p></div>'+
       stairsCard(0) + stairsCard(1);
@@ -904,6 +941,76 @@ function restoreDraft(){
   }
   document.getElementById('logNotes').value = draft.notes||'';
 }
+/* ---------- motivational quotes + toast ---------- */
+var QUOTES = [
+  ['The only easy day was yesterday.','Navy SEALs'],
+  ['Get comfortable being uncomfortable.','SEAL saying'],
+  ['It pays to be a winner.','BUD/S'],
+  ['Slow is smooth, smooth is fast.','military saying'],
+  ['Discipline equals freedom.','Jocko Willink'],
+  ['Stay hard.','David Goggins'],
+  ['Embrace the suck.','military saying'],
+  ['Pain is weakness leaving the body.','USMC saying'],
+  ['The more you sweat in training, the less you bleed in war.','military proverb'],
+  ['A smooth sea never made a skilled sailor.','proverb'],
+  ['Fortune favors the brave.','Latin motto'],
+  ['You don\'t rise to the occasion — you sink to the level of your training.','military saying'],
+  ['Earn your trident every day.','SEAL ethos'],
+  ['No one\'s coming to save you. Get after it.','David Goggins'],
+  ['The body achieves what the mind believes.','saying'],
+  ['Adapt and overcome.','USMC saying'],
+  ['One more set. That\'s where the change happens.','Trident Trainer'],
+  ['Quitting is a habit. So is finishing.','Trident Trainer']
+];
+function randomQuote(){
+  var q = QUOTES[Math.floor(Math.random()*QUOTES.length)];
+  return '&ldquo;'+q[0]+'&rdquo;<span class="qa">&mdash; '+q[1]+'</span>';
+}
+var toastTimer = null;
+function showToast(html, warn){
+  var t = document.getElementById('toast');
+  t.innerHTML = html;
+  t.classList.toggle('warn', !!warn);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, warn ? 2600 : 3200);
+}
+
+/* ---------- per-exercise history popup ---------- */
+function showExHistory(name){
+  var items = [];
+  for (var i=state.logs.length-1; i>=0 && items.length<6; i--){
+    var l = state.logs[i];
+    if (l.type!=='strength') continue;
+    var e = (l.exercises||[]).filter(function(x){return x.name===name;})[0];
+    if (!e) continue;
+    var d = e.setDetails
+      ? e.setDetails.map(function(s){ return (s.weight?s.weight+'×':'')+s.reps; }).join(', ')
+      : e.sets+'×'+e.reps+(e.weight?' @ '+e.weight+' lb':'');
+    items.push('<div class="ehrow"><span class="ehdate">'+l.date+'</span><span>'+d+'</span></div>');
+  }
+  document.getElementById('ehTitle').textContent = name;
+  document.getElementById('ehRows').innerHTML = items.length ? items.join('')
+    : '<div class="empty">No history yet — this fills in as you train.</div>';
+  document.getElementById('exhist').classList.add('show');
+}
+function showStairHistory(){
+  var items = [];
+  for (var i=state.logs.length-1; i>=0 && items.length<6; i--){
+    var l = state.logs[i];
+    if (l.type!=='stairs') continue;
+    var d = '<b>'+l.floors+' floors</b>'+(l.minutes?' in '+l.minutes+' min':'')+(l.vest?' @ '+l.vest+' lb':'');
+    if (l.sessions && l.sessions.filter(function(s){return s.floors;}).length>1){
+      d += ' ('+l.sessions.map(function(s,j){return 'S'+(j+1)+': '+s.floors;}).join(', ')+')';
+    }
+    items.push('<div class="ehrow"><span class="ehdate">'+l.date+'</span><span>'+d+'</span></div>');
+  }
+  document.getElementById('ehTitle').textContent = 'StairMaster';
+  document.getElementById('ehRows').innerHTML = items.length ? items.join('')
+    : '<div class="empty">No stair sessions yet.</div>';
+  document.getElementById('exhist').classList.add('show');
+}
+
 /* ---------- hooyah animation + live bar updates ---------- */
 function bestPerformanceExcluding(name, ratio, excludeLog){
   var best = 0;
@@ -1268,7 +1375,24 @@ document.addEventListener('touchend', function(){
 document.getElementById('logDate').value = todayStr();
 var autoSaveTimer = null;
 function queueAutoSave(){ clearTimeout(autoSaveTimer); autoSaveTimer = setTimeout(autoSave, 500); }
-document.getElementById('workoutArea').addEventListener('change', queueAutoSave);
+document.getElementById('workoutArea').addEventListener('change', function(ev){
+  var t = ev.target;
+  if (t.classList && t.classList.contains('ck') && t.checked){
+    var row = t.closest('.setrow');
+    var card = t.closest('.excard');
+    var rp = parseInt(row.querySelector('.rp').value)||0;
+    var wt = parseInt(row.querySelector('.wt').value)||0;
+    var needW = !isBW(card.dataset.ex);
+    if (!rp || (needW && !wt)){
+      t.checked = false;
+      var missing = !rp && needW && !wt ? 'weight and reps' : (!rp ? (card.dataset.ex==='Plank (sec)'?'seconds':'reps') : 'weight');
+      showToast('Enter '+missing+' before logging this set.', true);
+      return;
+    }
+    showToast(randomQuote());
+  }
+  queueAutoSave();
+});
 document.getElementById('workoutArea').addEventListener('input', queueAutoSave);
 document.getElementById('logNotes').addEventListener('input', queueAutoSave);
 document.getElementById('logDate').addEventListener('change', function(){ renderWorkout(); });
