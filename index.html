@@ -294,8 +294,8 @@
 
 <div id="hooyah" onclick="hideHooyah()">
   <div class="hymark">&#128305;</div>
-  <div class="hytitle">Hooyah!</div>
-  <div class="hysub">Workout Logged</div>
+  <div class="hytitle" id="hyTitle">Hooyah!</div>
+  <div class="hysub" id="hySub">Workout Logged</div>
   <div id="hyRows"></div>
   <button class="btn" onclick="hideHooyah()">Continue &rarr;</button>
 </div>
@@ -1081,6 +1081,8 @@ function showHooyah(log){
         ' &middot; <span class="gold">'+pctSeal+'% of '+b.tL+'</span></div></div>';
     });
   }
+  document.getElementById('hyTitle').textContent = 'Hooyah!';
+  document.getElementById('hySub').textContent = 'Workout Logged';
   document.getElementById('hyRows').innerHTML = rows;
   var ov = document.getElementById('hooyah');
   ov.classList.add('show');
@@ -1088,8 +1090,75 @@ function showHooyah(log){
     ov.querySelectorAll('.hyfill').forEach(function(f){ f.style.width = f.dataset.w + '%'; });
   }, 550);
 }
+function weekComplete(){
+  var wl = logsInWeek(currentWeek());
+  return ['d1','s1','d3','s2'].every(function(d){
+    return wl.some(function(l){ return l.day===d; });
+  });
+}
+function showWeekSummary(){
+  var cw = currentWeek();
+  var wl = logsInWeek(cw);
+  var floors=0, mins=0, sets=0, reps=0;
+  wl.forEach(function(l){
+    if (l.type==='stairs'){ floors += l.floors||0; mins += l.minutes||0; }
+    else (l.exercises||[]).forEach(function(e){
+      sets += e.sets;
+      if (e.setDetails) e.setDetails.forEach(function(s){ reps += s.reps; });
+      else reps += e.sets*e.reps;
+    });
+  });
+  // count new personal bests set this week
+  var start = weekRange(cw)[0];
+  var names = {};
+  wl.forEach(function(l){ (l.exercises||[]).forEach(function(e){ names[e.name]=1; }); });
+  var pbs = 0;
+  Object.keys(names).forEach(function(n){
+    var wk=0, pre=0;
+    state.logs.forEach(function(l){
+      if (l.type!=='strength') return;
+      var d = new Date(l.date+'T00:00:00');
+      (l.exercises||[]).forEach(function(e){
+        if (e.name!==n) return;
+        var v = e.setDetails ? Math.max.apply(null, e.setDetails.map(function(s){return s.reps;})) : e.reps;
+        if (d < start){ if (v>pre) pre=v; } else { if (v>wk) wk=v; }
+      });
+    });
+    if (pre>0 && wk>pre) pbs++;
+  });
+  function stat(label, val){
+    return '<div class="hyrow"><div class="hyname">'+label+'</div><div class="hytext">'+val+'</div></div>';
+  }
+  var esb = floors/102;
+  var rows = '';
+  rows += stat('Stairs', floors+' floors climbed'+(mins?' in '+mins+' min':'')+
+    (floors>=102 ? ' — that\'s the Empire State Building '+esb.toFixed(1)+'× over'
+                 : ' — '+Math.round(esb*100)+'% of the Empire State Building'));
+  rows += stat('Iron', sets+' sets &middot; '+reps+' total reps across your lifting days');
+  if (pbs) rows += stat('Personal bests', pbs+' exercise'+(pbs>1?'s':'')+' hit an all-time best this week <span class="pbtag">PB &times;'+pbs+'</span>');
+  if (cw < 12){
+    var np = programWeek(cw+1);
+    rows += stat('Next week', np.deload
+      ? 'DELOAD — half the volume. Recover hard, you\'ve earned it.'
+      : np.floorsPerSession+' floors/session'+(np.vest?' @ '+np.vest+' lb vest':'')+' &middot; lifting at '+np.rir+'. It gets heavier — that\'s the point.');
+  } else {
+    rows += stat('Program', '12 weeks complete. Retest your PST numbers and see how far you\'ve come.');
+  }
+  var q = QUOTES[Math.floor(Math.random()*QUOTES.length)];
+  rows += '<div class="hyrow" style="text-align:center"><div class="hytext" style="font-size:14px">&ldquo;'+q[0]+'&rdquo; &mdash; '+q[1]+'</div></div>';
+  document.getElementById('hyTitle').textContent = 'Week '+cw+' Done';
+  document.getElementById('hySub').textContent = 'All 4 training days complete';
+  document.getElementById('hyRows').innerHTML = rows;
+  document.getElementById('hooyah').classList.add('show');
+}
 function hideHooyah(){
   document.getElementById('hooyah').classList.remove('show');
+  if (weekComplete() && state.summaryWeek !== currentWeek()){
+    state.summaryWeek = currentWeek();
+    persist();
+    setTimeout(showWeekSummary, 300);
+    return;
+  }
   selectDay(nextWorkoutDay());
   renderPlan();
 }
