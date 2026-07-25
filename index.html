@@ -468,9 +468,11 @@ function feedbackAdj(fb){
 function lastPerformance(exName){
   var cw = currentWeek(), meso = mesoOf(cw);
   var best = null, sameMeso = false;
+  var sessionDate = (document.getElementById('logDate') && document.getElementById('logDate').value) || todayStr();
   for (var i=state.logs.length-1; i>=0; i--){
     var l = state.logs[i];
     if (l.type!=='strength') continue;
+    if (l.date === sessionDate) continue; // never base targets on today's own in-progress sets
     var lw = weekOfDate(l.date);
     if (isDeloadWeek(lw)) continue;
     var e = (l.exercises||[]).find(function(x){return x.name===exName;});
