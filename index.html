@@ -962,8 +962,98 @@ var QUOTES = [
   ['The body achieves what the mind believes.','saying'],
   ['Adapt and overcome.','USMC saying'],
   ['One more set. That\'s where the change happens.','Trident Trainer'],
-  ['Quitting is a habit. So is finishing.','Trident Trainer']
+  ['Quitting is a habit. So is finishing.','Trident Trainer'],
+  ['Don\'t expect to be motivated every day. Learn to be disciplined instead.','Jocko Willink'],
+  ['When your legs get tired, run with your heart.','military saying'],
+  ['The hard part isn\'t getting in shape. It\'s deciding to stay in the fight.','Trident Trainer'],
+  ['Comfort is a slow death. Choose the stairs.','Trident Trainer'],
+  ['Nobody drowns from falling in the water. They drown by staying there.','SEAL saying'],
+  ['Your mind quits a thousand times before your body ever does.','David Goggins paraphrase'],
+  ['Sweat now or regret it at the beach — the BUD/S beach.','Trident Trainer'],
+  ['If it was easy, everyone would wear the trident.','Trident Trainer'],
+  ['Two is one, one is none. Do the extra rep.','military saying'],
+  ['Excuses don\'t climb floors.','Trident Trainer'],
+  ['Amateurs train until they get it right. Professionals train until they can\'t get it wrong.','military saying'],
+  ['You don\'t have to be great to start, but you have to start to be great.','Zig Ziglar'],
+  ['Strength is never a weakness.','Mark Bell'],
+  ['The wolf on the hill is never as hungry as the wolf climbing it.','saying'],
+  ['Somewhere, someone is training when you aren\'t. When you meet, they win.','military saying'],
+  ['Make friends with pain and you\'ll never be alone.','Ken Chlouber'],
+  ['Every rep is a brick. Build the house.','Trident Trainer'],
+  ['Hard choices, easy life. Easy choices, hard life.','Jerzy Gregorek'],
+  ['Don\'t stop when you\'re tired. Stop when you\'re done.','David Goggins'],
+  ['The stairs don\'t care how you feel. Climb anyway.','Trident Trainer'],
+  ['Log it or it didn\'t happen.','Trident Trainer'],
+  ['Today\'s max is next month\'s warm-up.','Trident Trainer']
 ];
+/* exercise-specific records & facts (numbers hedged to stable, well-documented feats) */
+var EX_FACTS = {
+  'Pull-ups': [
+    'The 24-hour pull-up world record is over 8,600 reps. The average man can do 2.',
+    'David Goggins once cranked out 4,030 pull-ups in 17 hours for charity.',
+    'At 10 strict pull-ups you\'re past the SEAL PST minimum — most men never reach 5.'
+  ],
+  'Push-ups': [
+    'Charles Servizio did 46,001 push-ups in 24 hours back in 1993. Still legendary.',
+    'Minoru Yoshida did 10,507 push-ups NON-STOP in 1980. Your set just started.',
+    'SEAL competitive pace is 90+ push-ups in 2 minutes.'
+  ],
+  'Bench press': [
+    'The heaviest raw bench press on record is over 780 lb (Julius Maddox).',
+    'With bench shirts, humans have benched over 1,300 lb. Physics weeps.',
+    'A bodyweight bench puts you ahead of the vast majority of gym-goers.'
+  ],
+  'Overhead press': [
+    'Top strongmen put well over 450 lb overhead. Standing. For reps.',
+    'The overhead press was an Olympic lift until 1972 — the original test of strength.'
+  ],
+  'Barbell row': [
+    'A 1.25× bodyweight row is advanced-lifter territory — most never get there.',
+    'Rowing strength is pulling strength: every pound here feeds your pull-ups.'
+  ],
+  'Dips': [
+    '20 strict dips puts you ahead of roughly 95% of men.',
+    'Elite gymnasts do weighted ring dips with 100+ lb hanging off a belt.'
+  ],
+  'Sit-ups': [
+    'SEAL competitive pace: 90+ sit-ups in 2 minutes. Minimum to even qualify: 50.'
+  ],
+  'Weighted sit-ups': [
+    'Old-school boxers did thousands of weighted sit-ups a week to take body shots.'
+  ],
+  'Flutter kicks (4-ct)': [
+    'BUD/S classes get smoked with 1,000+ four-count flutter kicks on the beach. Wet. In the sand.'
+  ],
+  'Hanging leg raises': [
+    'Elite CrossFitters string together 50+ unbroken toes-to-bar. Grip goes before abs.'
+  ],
+  'Plank (sec)': [
+    'The plank world record is over 9 HOURS. Your 4-minute goal suddenly sounds fair.',
+    'George Hood set a plank record at age 62 — 8 hours, 15 minutes. No excuses.'
+  ],
+  'Russian twists': [
+    'Rotational core strength is what carries boats and logs at BUD/S. Literally.'
+  ],
+  'V-ups': [
+    'V-ups hit upper and lower abs at once — double pay for the same rep.'
+  ]
+};
+var motivBag = [];
+function nextMotiv(exName){
+  var facts = EX_FACTS[exName] || [];
+  if (facts.length && Math.random() < 0.4){
+    return '<b style="color:var(--accent)">DID YOU KNOW?</b> '+facts[Math.floor(Math.random()*facts.length)];
+  }
+  if (!motivBag.length){
+    motivBag = QUOTES.map(function(_, i){ return i; });
+    for (var i=motivBag.length-1; i>0; i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t = motivBag[i]; motivBag[i] = motivBag[j]; motivBag[j] = t;
+    }
+  }
+  var q = QUOTES[motivBag.pop()];
+  return '&ldquo;'+q[0]+'&rdquo;<span class="qa">&mdash; '+q[1]+'</span>';
+}
 function randomQuote(){
   var q = QUOTES[Math.floor(Math.random()*QUOTES.length)];
   return '&ldquo;'+q[0]+'&rdquo;<span class="qa">&mdash; '+q[1]+'</span>';
@@ -1468,7 +1558,7 @@ document.getElementById('workoutArea').addEventListener('change', function(ev){
       showToast('Enter '+missing+' before logging this set.', true);
       return;
     }
-    showToast(randomQuote());
+    showToast(nextMotiv(card.dataset.ex));
   }
   queueAutoSave();
 });
