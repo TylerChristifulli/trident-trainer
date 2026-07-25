@@ -1264,25 +1264,33 @@ function prepCanvas(id){
 function drawLine(id,data,labels){
   var p = prepCanvas(id), ctx=p.ctx;
   if (!data.length){ emptyChart(ctx,p); return; }
-  var pad={l:34,r:10,t:14,b:24};
-  var max = Math.max.apply(null,data)*1.15||10;
+  var pad={l:38,r:10,t:14,b:24};
+  // zoom the y-axis to the data range instead of anchoring at zero
+  var dMax = Math.max.apply(null,data);
+  var dMin = Math.min.apply(null,data);
+  var range = dMax - dMin;
+  if (range === 0){ range = Math.max(dMax*0.1, 2); } // flat data: give it breathing room
+  var max = dMax + range*0.2;
+  var min = Math.max(0, dMin - range*0.2);
+  var span = max - min || 1;
   var xw = (p.w-pad.l-pad.r)/Math.max(data.length-1,1);
   ctx.strokeStyle='#243140'; ctx.fillStyle='#8fa3b5'; ctx.font='10px sans-serif';
   for (var g=0; g<=4; g++){
     var y = pad.t+(p.h-pad.t-pad.b)*g/4;
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(p.w-pad.r,y); ctx.stroke();
-    ctx.fillText(Math.round(max*(1-g/4)), 4, y+3);
+    var lv = min + span*(1-g/4);
+    ctx.fillText(span < 10 ? lv.toFixed(1) : Math.round(lv), 4, y+3);
   }
+  function yOf(v){ return pad.t+(p.h-pad.t-pad.b)*(1-(v-min)/span); }
   ctx.strokeStyle='#3fa7d6'; ctx.lineWidth=2; ctx.beginPath();
   data.forEach(function(v,i){
-    var x = pad.l+xw*i, y = pad.t+(p.h-pad.t-pad.b)*(1-v/max);
+    var x = pad.l+xw*i, y = yOf(v);
     i?ctx.lineTo(x,y):ctx.moveTo(x,y);
   });
   ctx.stroke();
   ctx.fillStyle='#d4a017';
   data.forEach(function(v,i){
-    var x = pad.l+xw*i, y = pad.t+(p.h-pad.t-pad.b)*(1-v/max);
-    ctx.beginPath(); ctx.arc(x,y,3,0,7); ctx.fill();
+    ctx.beginPath(); ctx.arc(pad.l+xw*i, yOf(v), 3, 0, 7); ctx.fill();
   });
   ctx.fillStyle='#8fa3b5';
   var step = Math.ceil(labels.length/6);
