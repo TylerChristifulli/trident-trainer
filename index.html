@@ -701,7 +701,8 @@ document.querySelectorAll('#dayPick button').forEach(function(b){
   b.addEventListener('click', function(){ selectDay(b.dataset.day); });
 });
 
-/* Next day in the split you haven't done this week.
+/* Next day in the rotation, based on your LAST logged workout — not the calendar.
+   Train 4 days in 3 days or in 10, the cycle just keeps rolling: d1 → s1 → d3 → s2 → d1...
    Resumes an unfinished strength session from today first. */
 function nextWorkoutDay(){
   var order = ['d1','s1','d3','s2'];
@@ -710,11 +711,11 @@ function nextWorkoutDay(){
     var l = state.logs[i];
     if (l.date===today && l.type==='strength' && !l.feedback && l.day) return l.day;
   }
-  var wl = logsInWeek(currentWeek());
-  for (var j=0; j<order.length; j++){
-    var d = order[j];
-    var done = wl.some(function(l){ return l.day===d; });
-    if (!done) return d;
+  for (var j=state.logs.length-1; j>=0; j--){
+    var last = state.logs[j];
+    if (last.day && order.indexOf(last.day) !== -1){
+      return order[(order.indexOf(last.day)+1) % order.length];
+    }
   }
   return 'd1';
 }
@@ -1243,9 +1244,14 @@ function showWeekSummary(){
   document.getElementById('hyRows').innerHTML = rows;
   document.getElementById('hooyah').classList.add('show');
 }
+var lastFinishedLog = null;
 function hideHooyah(){
   document.getElementById('hooyah').classList.remove('show');
-  if (weekComplete() && state.summaryWeek !== currentWeek()){
+  // week summary fires only when THIS workout is the one that completed the week
+  // (first log of its day-slot this week) — never again on repeat days
+  var completedIt = lastFinishedLog && lastFinishedLog.day &&
+    logsInWeek(currentWeek()).filter(function(l){ return l.day===lastFinishedLog.day; }).length === 1;
+  if (weekComplete() && state.summaryWeek !== currentWeek() && completedIt){
     state.summaryWeek = currentWeek();
     persist();
     setTimeout(showWeekSummary, 300);
@@ -1273,6 +1279,7 @@ function finishWorkout(){
   }
   persist();
   sbSaveLog(draft);
+  lastFinishedLog = draft;
   showHooyah(draft);
   renderPlan();
 }
