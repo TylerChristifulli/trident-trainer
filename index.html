@@ -64,6 +64,10 @@
   .cmptext b{color:var(--green);}
   .gold{color:var(--accent);}
   .savestatus{font-size:12px; color:var(--green); margin-top:8px; min-height:15px;}
+  .photorow{display:flex; align-items:center; gap:14px; margin-top:4px;}
+  .photobtn{display:inline-block; background:var(--panel2); border:1px dashed var(--accent2); color:var(--accent2); border-radius:8px; padding:11px 16px; font-size:14px; cursor:pointer; width:auto; margin:0;}
+  .pthumb img{height:72px; border-radius:8px; border:1px solid var(--border); display:block;}
+  .histthumb{height:60px; border-radius:6px; border:1px solid var(--border); margin-top:4px;}
   .tgtline{display:inline-block; margin-top:10px; padding:5px 12px; border:1px solid var(--accent); border-radius:6px; font-size:13px; font-weight:700; letter-spacing:.5px; color:var(--accent); background:rgba(212,160,23,.08);}
   #hooyah{position:fixed; inset:0; z-index:200; background:rgba(8,12,17,.96); display:none; flex-direction:column; align-items:center; justify-content:center; padding:24px; text-align:center; cursor:pointer;}
   #hooyah.show{display:flex; animation:hyFade .25s;}
@@ -801,6 +805,11 @@ function renderWorkout(){
         '<label>Floors Climbed</label><input type="number" class="sfloors" placeholder="e.g. '+half+'">'+
         '<label>Duration (min)</label><input type="number" class="smin" placeholder="e.g. 15">'+
         '<label>Weight Vest / Pack (lb)</label><input type="number" class="svest" value="'+p.vest+'">'+
+        '<label>Watch / Machine Summary</label>'+
+        '<div class="photorow">'+
+        '<label class="photobtn">&#128247; Attach photo<input type="file" accept="image/*" class="sphoto" hidden onchange="uploadSummaryPhoto(this)"></label>'+
+        '<div class="pthumb"></div>'+
+        '</div>'+
         '</div>';
     }
     area.innerHTML =
@@ -826,6 +835,51 @@ function renderWorkout(){
     document.getElementById('fbRow').classList.remove('hidden');
   }
   restoreDraft();
+}
+
+/* ---------- summary photo upload (stairs) ---------- */
+function uploadSummaryPhoto(inp){
+  var file = inp.files && inp.files[0];
+  if (!file) return;
+  if (!sbClient){ showToast('Cloud not connected — photo can\'t be saved yet.', true); return; }
+  var card = inp.closest('.stairsess');
+  var sessIdx = parseInt(card.dataset.sess);
+  showToast('Uploading photo…');
+  var rd = new FileReader();
+  var img = new Image();
+  rd.onload = function(){ img.src = rd.result; };
+  img.onload = function(){
+    var maxW = 1200;
+    var sc = Math.min(1, maxW/img.width);
+    var c = document.createElement('canvas');
+    c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    c.toBlob(function(blob){
+      var date = document.getElementById('logDate').value || todayStr();
+      var path = 'summaries/'+date+'-'+currentDay+'-s'+(sessIdx+1)+'-'+Date.now()+'.jpg';
+      sbClient.storage.from('trident-trainer').upload(path, blob, {contentType:'image/jpeg', upsert:true})
+        .then(function(r){
+          if (r.error){ showToast('Upload failed: '+r.error.message, true); return; }
+          var url = sbClient.storage.from('trident-trainer').getPublicUrl(path).data.publicUrl;
+          card.querySelector('.pthumb').innerHTML =
+            '<a href="'+url+'" target="_blank" rel="noopener"><img src="'+url+'" alt="summary"></a>';
+          var draft = findDraft(date);
+          if (!draft){
+            draft = {id: Date.now(), date: date, type:'stairs', day: currentDay,
+                     floors:0, minutes:0, vest:0,
+                     sessions:[{floors:0,minutes:0,vest:0},{floors:0,minutes:0,vest:0}]};
+            state.logs.push(draft);
+          }
+          if (!draft.sessions) draft.sessions = [{floors:draft.floors||0, minutes:draft.minutes||0, vest:draft.vest||0},{floors:0,minutes:0,vest:0}];
+          while (draft.sessions.length <= sessIdx) draft.sessions.push({floors:0,minutes:0,vest:0});
+          draft.sessions[sessIdx].photo = url;
+          state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
+          persist(); sbSaveLog(draft); renderPlan();
+          showToast('Summary photo saved ✓');
+        });
+    }, 'image/jpeg', 0.8);
+  };
+  rd.readAsDataURL(file);
 }
 
 /* ---------- auto-save: every set saves the moment you log it ---------- */
@@ -876,15 +930,18 @@ function autoSave(){
   if (isStairsDay(currentDay)){
     var cards = document.querySelectorAll('#workoutArea .stairsess');
     if (!cards.length) return;
-    var sessions = [], totF = 0, totM = 0, maxV = 0;
-    cards.forEach(function(c){
+    var oldSess = (draft && draft.sessions) || [];
+    var sessions = [], totF = 0, totM = 0, maxV = 0, hasPhoto = false;
+    cards.forEach(function(c, i){
       var f = parseInt(c.querySelector('.sfloors').value)||0;
       var m = parseInt(c.querySelector('.smin').value)||0;
       var v = parseInt(c.querySelector('.svest').value)||0;
-      sessions.push({floors:f, minutes:m, vest:v});
+      var s = {floors:f, minutes:m, vest:v};
+      if (oldSess[i] && oldSess[i].photo){ s.photo = oldSess[i].photo; hasPhoto = true; }
+      sessions.push(s);
       totF += f; totM += m; if (v>maxV) maxV = v;
     });
-    if (!totF){ if (draft) removeDraft(draft); return; }
+    if (!totF && !hasPhoto){ if (draft) removeDraft(draft); return; }
     if (!draft){ draft = {id: Date.now(), date: date, type:'stairs', day: currentDay}; state.logs.push(draft); }
     draft.floors = totF;
     draft.minutes = totM;
@@ -919,6 +976,8 @@ function restoreDraft(){
       if (s.floors) c.querySelector('.sfloors').value = s.floors;
       if (s.minutes) c.querySelector('.smin').value = s.minutes;
       c.querySelector('.svest').value = s.vest||0;
+      if (s.photo) c.querySelector('.pthumb').innerHTML =
+        '<a href="'+s.photo+'" target="_blank" rel="noopener"><img src="'+s.photo+'" alt="summary"></a>';
     });
   } else {
     var area = document.getElementById('workoutArea');
@@ -1298,6 +1357,12 @@ function renderHistory(){
     var stairsBr = (l.type==='stairs' && l.sessions && l.sessions.filter(function(s){return s.floors;}).length>1)
       ? '<br>'+l.sessions.map(function(s,i){ return 'Session '+(i+1)+': '+s.floors+' floors'+(s.minutes?' in '+s.minutes+' min':''); }).join('<br>')
       : '';
+    if (l.type==='stairs' && l.sessions){
+      var thumbs = l.sessions.filter(function(s){return s.photo;}).map(function(s){
+        return '<a href="'+s.photo+'" target="_blank" rel="noopener"><img class="histthumb" src="'+s.photo+'"></a>';
+      }).join(' ');
+      if (thumbs) stairsBr += '<br>'+thumbs;
+    }
     var detail = l.type==='stairs'
       ? '<b>'+l.floors+' floors total</b>'+(l.minutes?' in '+l.minutes+' min':'')+(l.vest?' @ '+l.vest+' lb vest':'')+stairsBr
       : l.exercises.map(function(e){
