@@ -179,7 +179,7 @@
     <h2>Program Settings</h2>
     <label>Program Start Date</label>
     <input type="date" id="startDate" onchange="setStartDate(this.value)">
-    <p class="note">12 weeks = two 6-week mesocycles (RP-style). Each meso: 5 weeks of accumulating volume with intensity ramping from 3 RIR down to 0 RIR, then a deload. Lifting targets auto-progress from your logged sessions — hit the top of a rep range and the app bumps the load; your post-workout feedback adds or removes sets the following week.</p>
+    <p class="note">12 weeks = two 6-week mesocycles (RP-style). Each meso: 5 weeks with intensity ramping from 3 RIR down to 0 RIR, then a deload. Lifting targets auto-progress using an estimated-1RM formula (Epley) from your logged sets — max out heavy one day and the app converts it to the right weight for the 6–10 rep range at this week's RIR. Set counts stay fixed; progress comes as reps and load.</p>
   </div>
 
   <div class="card">
@@ -515,12 +515,8 @@ function getRecommendation(exName){
     note:(isBW(exName)&&bw?'Bodyweight ('+bw+' lb). ':'')+'First time — pick a load/reps you finish at '+rirLabel(cw)+'.'};
   var e = lp.perf.entry;
   var sets = e.sets, reps = e.reps, weight = e.weight||0, note, target;
-  // Set progression: only accumulate within the same meso; new meso resets to 3.
-  if (lp.sameMeso){
-    sets = Math.min(6, Math.max(2, sets + feedbackAdj(lp.perf.log.feedback)));
-  } else {
-    sets = 3;
-  }
+  // Sets stay where you had them — progress comes from reps and load, never extra sets.
+  sets = Math.max(2, sets);
   // Load/rep progression
   if (isBW(exName)){
     reps = reps+2;
@@ -528,12 +524,25 @@ function getRecommendation(exName){
     target = sets+' sets × '+reps+' '+unit+' @ bodyweight'+(bw?' ('+bw+' lb)':'');
     note='Last: '+e.reps+' '+unit+'/set. Bodyweight'+(bw?' ('+bw+' lb)':'')+' — add 2 '+unit+' per set.';
   } else if (weight>0){
-    if (reps>=10){ weight = roundTo5(weight*1.05); reps = Math.max(6, reps-3);
-      target = sets+' sets × 6–10 reps @ '+weight+' lb (start at '+reps+')';
-      note='Hit top of rep range last time ('+e.weight+'×'+e.reps+') — add load, drop reps.'; }
-    else { reps = reps+1;
-      target = sets+' sets × 6–10 reps @ '+weight+' lb (aim for '+reps+')';
-      note='Last: '+e.weight+' lb × '+e.reps+'. Same weight, +1 rep per set.'; }
+    // Estimated-1RM (Epley) progression: any performance — a grinding max double or a
+    // clean set of 8 — converts to the right weight for today's rep range and RIR.
+    var lastRir = RIR_TARGETS[mesoWeekOf(lp.perf.week)-1]; if (lastRir==null) lastRir = 2;
+    var nowRir = RIR_TARGETS[mesoWeekOf(cw)-1]; if (nowRir==null) nowRir = 2;
+    var e1 = 0;
+    (e.setDetails || [{weight:weight, reps:reps}]).forEach(function(s){
+      if (s.weight>0 && s.reps>0){
+        var est = s.weight * (1 + (s.reps + lastRir)/30);
+        if (est > e1) e1 = est;
+      }
+    });
+    var tr;
+    if (reps >= 10) tr = 6;        // topped the range — reset low, load will jump
+    else if (reps < 6) tr = 8;     // maxed heavy last time — re-anchor mid-range
+    else tr = reps + 1;            // normal ladder: +1 rep
+    weight = roundTo5(e1 / (1 + (tr + nowRir)/30));
+    reps = tr;
+    target = sets+' sets × 6–10 reps @ '+weight+' lb (aim for '+tr+')';
+    note = 'Last: '+e.weight+' lb × '+e.reps+' → est. 1RM ~'+Math.round(e1)+' lb. Weight formula-matched to today\'s intensity.';
   } else {
     reps = reps+2;
     target = sets+' sets × '+reps+' '+unit;
@@ -840,14 +849,46 @@ function renderWorkout(){
 /* ---------- summary photo upload (stairs) ---------- */
 function uploadSummaryPhoto(inp){
   var file = inp.files && inp.files[0];
+  inp.value = '';
   if (!file) return;
   if (!sbClient){ showToast('Cloud not connected — photo can\'t be saved yet.', true); return; }
   var card = inp.closest('.stairsess');
   var sessIdx = parseInt(card.dataset.sess);
   showToast('Uploading photo…');
+  function doUpload(blob, ext, ctype){
+    var date = document.getElementById('logDate').value || todayStr();
+    var path = 'summaries/'+date+'-'+currentDay+'-s'+(sessIdx+1)+'-'+Date.now()+'.'+ext;
+    sbClient.storage.from('trident-trainer').upload(path, blob, {contentType: ctype})
+      .then(function(r){
+        if (r.error){ showToast('Upload failed: '+r.error.message, true); return; }
+        var url = sbClient.storage.from('trident-trainer').getPublicUrl(path).data.publicUrl;
+        card.querySelector('.pthumb').innerHTML =
+          '<a href="'+url+'" target="_blank" rel="noopener"><img src="'+url+'" alt="summary"></a>';
+        var draft = findDraft(date);
+        if (!draft){
+          draft = {id: Date.now(), date: date, type:'stairs', day: currentDay,
+                   floors:0, minutes:0, vest:0,
+                   sessions:[{floors:0,minutes:0,vest:0},{floors:0,minutes:0,vest:0}]};
+          state.logs.push(draft);
+        }
+        if (!draft.sessions) draft.sessions = [{floors:draft.floors||0, minutes:draft.minutes||0, vest:draft.vest||0},{floors:0,minutes:0,vest:0}];
+        while (draft.sessions.length <= sessIdx) draft.sessions.push({floors:0,minutes:0,vest:0});
+        draft.sessions[sessIdx].photo = url;
+        state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
+        persist(); sbSaveLog(draft); renderPlan();
+        showToast('Summary photo saved ✓');
+      })
+      .catch(function(err){ showToast('Upload failed: '+(err.message||err), true); });
+  }
   var rd = new FileReader();
   var img = new Image();
+  rd.onerror = function(){ showToast('Could not read that photo.', true); };
   rd.onload = function(){ img.src = rd.result; };
+  // if the browser can't decode it (e.g. HEIC), upload the original file untouched
+  img.onerror = function(){
+    var ext = (file.name && file.name.split('.').pop().toLowerCase()) || 'jpg';
+    doUpload(file, ext, file.type || 'application/octet-stream');
+  };
   img.onload = function(){
     var maxW = 1200;
     var sc = Math.min(1, maxW/img.width);
@@ -855,28 +896,8 @@ function uploadSummaryPhoto(inp){
     c.width = Math.round(img.width*sc); c.height = Math.round(img.height*sc);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
     c.toBlob(function(blob){
-      var date = document.getElementById('logDate').value || todayStr();
-      var path = 'summaries/'+date+'-'+currentDay+'-s'+(sessIdx+1)+'-'+Date.now()+'.jpg';
-      sbClient.storage.from('trident-trainer').upload(path, blob, {contentType:'image/jpeg', upsert:true})
-        .then(function(r){
-          if (r.error){ showToast('Upload failed: '+r.error.message, true); return; }
-          var url = sbClient.storage.from('trident-trainer').getPublicUrl(path).data.publicUrl;
-          card.querySelector('.pthumb').innerHTML =
-            '<a href="'+url+'" target="_blank" rel="noopener"><img src="'+url+'" alt="summary"></a>';
-          var draft = findDraft(date);
-          if (!draft){
-            draft = {id: Date.now(), date: date, type:'stairs', day: currentDay,
-                     floors:0, minutes:0, vest:0,
-                     sessions:[{floors:0,minutes:0,vest:0},{floors:0,minutes:0,vest:0}]};
-            state.logs.push(draft);
-          }
-          if (!draft.sessions) draft.sessions = [{floors:draft.floors||0, minutes:draft.minutes||0, vest:draft.vest||0},{floors:0,minutes:0,vest:0}];
-          while (draft.sessions.length <= sessIdx) draft.sessions.push({floors:0,minutes:0,vest:0});
-          draft.sessions[sessIdx].photo = url;
-          state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
-          persist(); sbSaveLog(draft); renderPlan();
-          showToast('Summary photo saved ✓');
-        });
+      if (!blob){ doUpload(file, 'jpg', file.type || 'image/jpeg'); return; }
+      doUpload(blob, 'jpg', 'image/jpeg');
     }, 'image/jpeg', 0.8);
   };
   rd.readAsDataURL(file);
@@ -1011,43 +1032,43 @@ function restoreDraft(){
 }
 /* ---------- motivational quotes + toast ---------- */
 var QUOTES = [
-  ['The only easy day was yesterday.','Navy SEALs'],
-  ['Get comfortable being uncomfortable.','SEAL saying'],
-  ['It pays to be a winner.','BUD/S'],
-  ['Slow is smooth, smooth is fast.','military saying'],
+  ['The only easy day was yesterday.','U.S. Navy SEALs motto'],
+  ['Get comfortable being uncomfortable.','SEAL adage (origin unknown)'],
+  ['It pays to be a winner.','BUD/S instructor call'],
+  ['Slow is smooth, smooth is fast.','U.S. special operations adage'],
   ['Discipline equals freedom.','Jocko Willink'],
   ['Stay hard.','David Goggins'],
-  ['Embrace the suck.','military saying'],
-  ['Pain is weakness leaving the body.','USMC saying'],
-  ['The more you sweat in training, the less you bleed in war.','military proverb'],
-  ['A smooth sea never made a skilled sailor.','proverb'],
-  ['Fortune favors the brave.','Latin motto'],
-  ['You don\'t rise to the occasion — you sink to the level of your training.','military saying'],
-  ['Earn your trident every day.','SEAL ethos'],
-  ['No one\'s coming to save you. Get after it.','David Goggins'],
-  ['The body achieves what the mind believes.','saying'],
-  ['Adapt and overcome.','USMC saying'],
+  ['Embrace the suck.','U.S. military adage'],
+  ['Pain is weakness leaving the body.','USMC recruiting slogan'],
+  ['The more you sweat in training, the less you bleed in battle.','military proverb (origin unknown)'],
+  ['A smooth sea never made a skilled sailor.','attributed to Franklin D. Roosevelt'],
+  ['Fortune favors the brave.','Virgil, Aeneid'],
+  ['We don\'t rise to the level of our expectations; we fall to the level of our training.','attributed to Archilochus'],
+  ['Earn your trident every day.','U.S. Navy SEAL Ethos'],
+  ['No one\'s coming to save you. Get after it.','David Goggins (paraphrase)'],
+  ['The body achieves what the mind believes.','origin unknown'],
+  ['Improvise, adapt, and overcome.','USMC unofficial motto'],
   ['One more set. That\'s where the change happens.','Trident Trainer'],
   ['Quitting is a habit. So is finishing.','Trident Trainer'],
-  ['Don\'t expect to be motivated every day. Learn to be disciplined instead.','Jocko Willink'],
-  ['When your legs get tired, run with your heart.','military saying'],
+  ['Don\'t count on motivation. Count on discipline.','Jocko Willink (paraphrase)'],
+  ['When your legs can\'t run anymore, run with your heart.','origin unknown'],
   ['The hard part isn\'t getting in shape. It\'s deciding to stay in the fight.','Trident Trainer'],
   ['Comfort is a slow death. Choose the stairs.','Trident Trainer'],
-  ['Nobody drowns from falling in the water. They drown by staying there.','SEAL saying'],
-  ['Your mind quits a thousand times before your body ever does.','David Goggins paraphrase'],
+  ['You don\'t drown by falling in the water; you drown by staying there.','Edwin Louis Cole'],
+  ['Your mind quits a thousand times before your body ever does.','David Goggins (paraphrase)'],
   ['Sweat now or regret it at the beach — the BUD/S beach.','Trident Trainer'],
   ['If it was easy, everyone would wear the trident.','Trident Trainer'],
-  ['Two is one, one is none. Do the extra rep.','military saying'],
+  ['Two is one, one is none. Do the extra rep.','U.S. military adage'],
   ['Excuses don\'t climb floors.','Trident Trainer'],
-  ['Amateurs train until they get it right. Professionals train until they can\'t get it wrong.','military saying'],
+  ['Amateurs practice until they get it right. Professionals practice until they can\'t get it wrong.','attributed to Harold Craxton'],
   ['You don\'t have to be great to start, but you have to start to be great.','Zig Ziglar'],
   ['Strength is never a weakness.','Mark Bell'],
-  ['The wolf on the hill is never as hungry as the wolf climbing it.','saying'],
-  ['Somewhere, someone is training when you aren\'t. When you meet, they win.','military saying'],
-  ['Make friends with pain and you\'ll never be alone.','Ken Chlouber'],
+  ['The wolf on the hill is never as hungry as the wolf climbing the hill.','origin unknown'],
+  ['Somewhere, someone is training when you aren\'t. When you meet, they win.','gym proverb (origin unknown)'],
+  ['Make friends with pain, and you will never be alone.','Ken Chlouber, Leadville 100 founder'],
   ['Every rep is a brick. Build the house.','Trident Trainer'],
   ['Hard choices, easy life. Easy choices, hard life.','Jerzy Gregorek'],
-  ['Don\'t stop when you\'re tired. Stop when you\'re done.','David Goggins'],
+  ['Don\'t stop when you\'re tired. Stop when you\'re done.','attributed to David Goggins'],
   ['The stairs don\'t care how you feel. Climb anyway.','Trident Trainer'],
   ['Log it or it didn\'t happen.','Trident Trainer'],
   ['Today\'s max is next month\'s warm-up.','Trident Trainer']
@@ -1125,13 +1146,13 @@ function randomQuote(){
   return '&ldquo;'+q[0]+'&rdquo;<span class="qa">&mdash; '+q[1]+'</span>';
 }
 var toastTimer = null;
-function showToast(html, warn){
+function showToast(html, warn, ms){
   var t = document.getElementById('toast');
   t.innerHTML = html;
   t.classList.toggle('warn', !!warn);
   t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, warn ? 2600 : 3200);
+  toastTimer = setTimeout(function(){ t.classList.remove('show'); }, ms || (warn ? 2600 : 3500));
 }
 
 /* ---------- per-exercise history popup ---------- */
@@ -1636,7 +1657,8 @@ document.getElementById('workoutArea').addEventListener('change', function(ev){
       showToast('Enter '+missing+' before logging this set.', true);
       return;
     }
-    showToast(nextMotiv(card.dataset.ex));
+    var motiv = nextMotiv(card.dataset.ex);
+    showToast(motiv, false, motiv.indexOf('DID YOU KNOW') !== -1 ? 8000 : 3500);
   }
   queueAutoSave();
 });
