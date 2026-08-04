@@ -521,8 +521,8 @@ function getRecommendation(exName){
   if (isBW(exName)){
     reps = reps+2;
     weight = bw || weight;
-    target = sets+' sets × '+reps+' '+unit+' @ bodyweight'+(bw?' ('+bw+' lb)':'');
-    note='Last: '+e.reps+' '+unit+'/set. Bodyweight'+(bw?' ('+bw+' lb)':'')+' — add 2 '+unit+' per set.';
+    target = sets+' sets @ bodyweight'+(bw?' ('+bw+' lb)':'')+' — '+reps+' '+unit+' on set 1, back-offs fade';
+    note='Last best: '+e.reps+' '+unit+'. Set 1 targets +2; later sets pre-filled with fatigue drop-off.';
   } else if (weight>0){
     // Estimated-1RM (Epley) progression: any performance — a grinding max double or a
     // clean set of 8 — converts to the right weight for today's rep range and RIR.
@@ -541,8 +541,8 @@ function getRecommendation(exName){
     else tr = reps + 1;            // normal ladder: +1 rep
     weight = roundTo5(e1 / (1 + (tr + nowRir)/30));
     reps = tr;
-    target = sets+' sets × 6–10 reps @ '+weight+' lb (aim for '+tr+')';
-    note = 'Last: '+e.weight+' lb × '+e.reps+' → est. 1RM ~'+Math.round(e1)+' lb. Weight formula-matched to today\'s intensity.';
+    target = sets+' sets @ '+weight+' lb — '+tr+' reps on set 1, back-offs pre-filled lighter';
+    note = 'Last: '+e.weight+' lb × '+e.reps+' → est. 1RM ~'+Math.round(e1)+' lb. Only set 1 is the max target — later sets account for fatigue.';
   } else {
     reps = reps+2;
     target = sets+' sets × '+reps+' '+unit;
@@ -748,11 +748,19 @@ function setRowHTML(name, wtVal, rpVal){
     '<button class="sdel" onclick="delSet(this)" title="Delete set">&times;</button>'+
     '</div>';
 }
+/* Fatigue drop-off: set 1 gets the full target, back-off sets pre-fill lighter.
+   Bodyweight/timed moves fade ~20% per set; barbell sets drop ~1 rep per set. */
+function fatigueReps(base, i, bwMove){
+  if (!base) return '';
+  var v = bwMove ? Math.round(base*(1 - 0.2*i)) : (base - i);
+  return Math.max(1, v);
+}
 function exCard(name, muscle, r){
   var rows = '';
   var n = r.sets || 3;
   var isTime = (name==='Plank (sec)');
-  for (var i=0;i<n;i++){ rows += setRowHTML(name, r.weight, r.reps); }
+  var bwMove = isBW(name);
+  for (var i=0;i<n;i++){ rows += setRowHTML(name, r.weight, fatigueReps(r.reps, i, bwMove)); }
   var info = EX_INFO[name] ? '<div class="howto">'+EX_INFO[name]+
     ' <a href="'+exDemoLink(name)+'" target="_blank" rel="noopener">Watch demo &#9654;</a></div>' : '';
   return '<div class="card excard" data-ex="'+name+'">'+
@@ -986,8 +994,12 @@ function autoSave(){
 function restoreDraft(){
   var date = document.getElementById('logDate').value || todayStr();
   var draft = findDraft(date);
-  setSaveStatus(draft ? 'Workout in progress — every set saves automatically. ✓'
-                      : 'Every set you check off saves automatically.');
+  var isToday = (date === todayStr());
+  setSaveStatus(draft
+    ? (isToday ? 'Workout in progress — every set saves automatically. ✓'
+               : 'Viewing '+date+' — this is what you hit. Edits update that logged workout.')
+    : (isToday ? 'Every set you check off saves automatically.'
+               : 'Nothing logged for this day slot on '+date+'. Try another day button, or pick today\'s date to train.'));
   if (!draft) return;
   if (draft.type==='stairs'){
     var cards = document.querySelectorAll('#workoutArea .stairsess');
@@ -1664,7 +1676,13 @@ document.getElementById('workoutArea').addEventListener('change', function(ev){
 });
 document.getElementById('workoutArea').addEventListener('input', queueAutoSave);
 document.getElementById('logNotes').addEventListener('input', queueAutoSave);
-document.getElementById('logDate').addEventListener('change', function(){ renderWorkout(); });
+document.getElementById('logDate').addEventListener('change', function(){
+  // calendar navigation: jump to whatever was trained on that date
+  var d = this.value;
+  var dayLogs = state.logs.filter(function(l){ return l.date===d && l.day; });
+  if (dayLogs.length){ selectDay(dayLogs[0].day); }
+  else { renderWorkout(); }
+});
 if (sbCfg){
   document.getElementById('sbUrl').value = sbCfg.url;
   document.getElementById('sbKey').value = sbCfg.key;
