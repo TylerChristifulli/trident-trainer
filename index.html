@@ -809,33 +809,14 @@ function renderWorkout(){
   if (isStairsDay(currentDay)){
     var p = programWeek(cw);
     document.getElementById('woSub').textContent = (currentDay==='s1'?'Day 2':'Day 4')+' — StairMaster Floor Climb';
-    var half = Math.round(p.floorsPerSession/2);
-    function stairsCard(i){
-      return '<div class="card excard stairsess" data-sess="'+i+'">'+
-        '<span class="chip">CARDIO</span><h3>StairMaster — Session '+(i+1)+'</h3>'+
-        (i===0
-          ? '<div class="howto">Stay upright — hands resting light, not gripping the rails. Full steps, steady pace. '+
-            '<a href="https://www.youtube.com/results?search_query=stairmaster+technique+tips" target="_blank" rel="noopener">Watch demo &#9654;</a></div>'
-          : '<div class="howto">Round two — take your break, then knock out the rest.</div>')+
-        '<div class="reco">&#9654; Suggested: ~'+half+' floors this session'+
-        (p.vest?' @ '+p.vest+' lb vest':'')+(p.deload?' (deload — easy pace)':'')+'</div>'+
-        '<label>Floors Climbed</label><input type="number" class="sfloors" placeholder="e.g. '+half+'">'+
-        '<label>Duration (min)</label><input type="number" class="smin" placeholder="e.g. 15">'+
-        '<label>Weight Vest / Pack (lb)</label><input type="number" class="svest" value="'+p.vest+'">'+
-        '<label>Watch / Machine Summary</label>'+
-        '<div class="photorow">'+
-        '<label class="photobtn">&#128247; Attach photo<input type="file" accept="image/*" class="sphoto" hidden onchange="uploadSummaryPhoto(this)"></label>'+
-        '<div class="pthumb"></div>'+
-        '</div>'+
-        '</div>';
-    }
     area.innerHTML =
       '<div class="card"><div class="exhead"><h2 style="margin:0">Today\'s Target</h2>'+
       '<button class="histbtn" onclick="showStairHistory()">&#8635; Last time</button></div>'+
-      '<div class="target"><span class="name">Total floors (both sessions)</span>'+
+      '<div class="target"><span class="name">Total floors</span>'+
       '<span class="val">'+p.floorsPerSession+(p.vest?' @ '+p.vest+' lb':'')+'</span></div>'+
-      '<p class="note">Split it however you like — go hard, take a short break, then finish the rest in Session 2.</p></div>'+
-      stairsCard(0) + stairsCard(1);
+      '<p class="note">One session is the standard. Need a break partway? Tap + Add Session 2 and split it.</p></div>'+
+      stairsCardHTML(0, p)+
+      '<button class="addset" id="addSess2" style="margin-bottom:14px" onclick="addSecondSession()">+ Add Session 2</button>';
     document.getElementById('fbRow').classList.add('hidden');
   } else {
     var day = WORKOUT_DAYS[currentDay];
@@ -852,6 +833,37 @@ function renderWorkout(){
     document.getElementById('fbRow').classList.remove('hidden');
   }
   restoreDraft();
+}
+
+/* ---------- stair session cards (one by default, second on demand) ---------- */
+function stairsCardHTML(i, p){
+  var sug = i===0 ? p.floorsPerSession : Math.round(p.floorsPerSession/2);
+  return '<div class="card excard stairsess" data-sess="'+i+'">'+
+    '<span class="chip">CARDIO</span><h3>StairMaster'+(i===1?' — Session 2':'')+'</h3>'+
+    (i===0
+      ? '<div class="howto">Stay upright — hands resting light, not gripping the rails. Full steps, steady pace. '+
+        '<a href="https://www.youtube.com/results?search_query=stairmaster+technique+tips" target="_blank" rel="noopener">Watch demo &#9654;</a></div>'
+      : '<div class="howto">Round two — after your break, log whatever\'s left here.</div>')+
+    '<div class="reco">&#9654; '+(i===0
+      ? 'Target: '+p.floorsPerSession+' floors'+(p.vest?' @ '+p.vest+' lb vest':'')+(p.deload?' (deload — easy pace)':'')
+      : 'Session 2 — the rest of today\'s floors.')+'</div>'+
+    '<label>Floors Climbed</label><input type="number" class="sfloors" placeholder="e.g. '+sug+'">'+
+    '<label>Duration (min)</label><input type="number" class="smin" placeholder="e.g. 15">'+
+    '<label>Weight Vest / Pack (lb)</label><input type="number" class="svest" value="'+p.vest+'">'+
+    '<label>Watch / Machine Summary</label>'+
+    '<div class="photorow">'+
+    '<label class="photobtn">&#128247; Attach photo<input type="file" accept="image/*" class="sphoto" hidden onchange="uploadSummaryPhoto(this)"></label>'+
+    '<div class="pthumb"></div>'+
+    '</div>'+
+    '</div>';
+}
+function addSecondSession(){
+  var btn = document.getElementById('addSess2');
+  if (!btn) return;
+  var tmp = document.createElement('div');
+  tmp.innerHTML = stairsCardHTML(1, programWeek(currentWeek()));
+  btn.parentNode.insertBefore(tmp.firstChild, btn);
+  btn.remove();
 }
 
 /* ---------- OCR: read floors/time/cal/HR from the summary photo ---------- */
@@ -1063,8 +1075,9 @@ function restoreDraft(){
                : 'Nothing logged for this day slot on '+date+'. Try another day button, or pick today\'s date to train.'));
   if (!draft) return;
   if (draft.type==='stairs'){
-    var cards = document.querySelectorAll('#workoutArea .stairsess');
     var sess = draft.sessions || [{floors:draft.floors, minutes:draft.minutes, vest:draft.vest}];
+    if (sess[1] && (sess[1].floors || sess[1].photo)) addSecondSession();
+    var cards = document.querySelectorAll('#workoutArea .stairsess');
     cards.forEach(function(c, i){
       var s = sess[i]; if (!s) return;
       if (s.floors) c.querySelector('.sfloors').value = s.floors;
