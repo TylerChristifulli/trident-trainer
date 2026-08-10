@@ -91,6 +91,9 @@
   .daypick{display:flex; gap:6px; margin-top:4px;}
   .daypick button{flex:1; background:var(--panel2); border:1px solid var(--border); color:var(--muted); border-radius:8px; padding:7px 2px; font-size:12px; line-height:1.35; cursor:pointer; letter-spacing:.5px;}
   .daypick button.active{border-color:var(--accent); color:var(--accent); font-weight:700;}
+  .loctoggle{display:flex; gap:6px; margin-top:10px;}
+  .loctoggle button{flex:1; background:var(--panel2); border:1px solid var(--border); color:var(--muted); border-radius:8px; padding:8px 4px; font-size:13px; cursor:pointer;}
+  .loctoggle button.active{border-color:var(--accent2); color:var(--accent2); font-weight:700;}
   .excard h3{font-size:19px; font-weight:800; margin:6px 0 0;}
   .chip{display:inline-block; font-size:11px; font-weight:700; letter-spacing:1.5px; padding:4px 12px; border-radius:8px; background:rgba(76,175,125,.15); color:var(--green);}
   .sethead{display:grid; grid-template-columns:1fr 1fr 52px 26px; gap:10px; margin-top:12px; font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; text-align:center;}
@@ -221,6 +224,10 @@
       <button data-day="s2">D4<br>Stairs</button>
     </div>
     <div class="rirbanner" id="rirBanner"></div>
+    <div class="loctoggle" id="locToggle">
+      <button data-loc="gym" class="active">&#127947; Gym</button>
+      <button data-loc="home">&#127976; Home / Hotel</button>
+    </div>
     <div class="savestatus" id="saveStatus"></div>
   </div>
 
@@ -455,7 +462,7 @@ function compl(n,done,total){
 }
 
 /* ---------- RP-style progressive overload engine ---------- */
-var CORE_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups'];
+var CORE_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Backpack rows'];
 
 function weekOfDate(dateStr){
   var start = new Date(state.startDate+'T00:00:00');
@@ -569,6 +576,26 @@ var WORKOUT_DAYS = {
     {n:'Russian twists', m:'Core'},
     {n:'Plank (sec)', m:'Core'}]}
 };
+/* home / hotel versions — same muscles, zero equipment (a backpack at most) */
+var HOME_DAYS = {
+  d1:{name:'Day 1 — Upper Body A (Home)', ex:[
+    {n:'Inverted rows (table/towel)', m:'Back'},
+    {n:'Decline push-ups', m:'Chest'},
+    {n:'Pike push-ups', m:'Shoulders'},
+    {n:'Push-ups', m:'Chest'},
+    {n:'Sit-ups', m:'Core'},
+    {n:'Lying leg raises', m:'Core'}]},
+  d3:{name:'Day 3 — Upper Body B (Home)', ex:[
+    {n:'Backpack rows', m:'Back'},
+    {n:'Chair dips', m:'Chest'},
+    {n:'Push-ups', m:'Chest'},
+    {n:'Flutter kicks (4-ct)', m:'Core'},
+    {n:'Russian twists', m:'Core'},
+    {n:'Plank (sec)', m:'Core'}]}
+};
+var homeMode = 'gym';
+try { homeMode = localStorage.getItem('tridentLoc') || 'gym'; } catch(e){}
+
 var DAY_LABELS = {d1:'DAY 1', s1:'DAY 2', d3:'DAY 3', s2:'DAY 4'};
 
 /* ---------- exercise form cues + demo links ---------- */
@@ -591,7 +618,13 @@ var EX_INFO = {
   'Dips':'Shoulders down away from ears, lean slightly forward. Descend to 90° elbows, press to lockout.',
   'Weighted sit-ups':'Hold a plate on your chest. Same strict form as sit-ups — controlled both directions.',
   'Russian twists':'Seated, heels light or off the floor. Rotate your torso side to side — the weight follows, don’t just swing arms.',
-  'V-ups':'Lying flat, lift legs and torso together to touch your toes at the top. Lower with control.'
+  'V-ups':'Lying flat, lift legs and torso together to touch your toes at the top. Lower with control.',
+  'Inverted rows (table/towel)':'Lie under a sturdy table and pull your chest to the edge, body rigid — or loop a towel over a solid door and row back. The hotel pull-up.',
+  'Decline push-ups':'Feet up on the bed or a chair, hands on the floor. Shifts the load up into chest and shoulders — your travel bench press.',
+  'Pike push-ups':'Hips high in an upside-down V, lower your head between your hands. An overhead press with no barbell.',
+  'Chair dips':'Hands on a chair edge behind you, legs stretched out, lower to 90° elbows and press up.',
+  'Lying leg raises':'Flat on your back, legs straight to vertical, lower slowly without letting your back arch.',
+  'Backpack rows':'Stuff a backpack heavy (books, water bottles), hinge flat-back, row it to your hip. One arm on the chair works too.'
 };
 function exDemoLink(name){
   var q = name.replace(/\s*\(.*\)/,'') + ' proper form';
@@ -659,7 +692,7 @@ function benchmarkHTML(name){
 }
 
 /* ---------- body weight tracking ---------- */
-var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups'];
+var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises'];
 function isBW(name){ return BW_EX.indexOf(name) !== -1; }
 function currentBodyweight(){
   if (!state.bw.length) return 0;
@@ -718,6 +751,19 @@ function selectDay(d){
 }
 document.querySelectorAll('#dayPick button').forEach(function(b){
   b.addEventListener('click', function(){ selectDay(b.dataset.day); });
+});
+document.querySelectorAll('#locToggle button').forEach(function(b){
+  b.addEventListener('click', function(){
+    homeMode = b.dataset.loc;
+    try { localStorage.setItem('tridentLoc', homeMode); } catch(e){}
+    document.querySelectorAll('#locToggle button').forEach(function(x){
+      x.classList.toggle('active', x.dataset.loc===homeMode);
+    });
+    renderWorkout();
+  });
+});
+document.querySelectorAll('#locToggle button').forEach(function(x){
+  x.classList.toggle('active', x.dataset.loc===homeMode);
 });
 
 /* Next day in the rotation, based on your LAST logged workout — not the calendar.
@@ -818,8 +864,9 @@ function renderWorkout(){
       stairsCardHTML(0, p)+
       '<button class="addset" id="addSess2" style="margin-bottom:14px" onclick="addSecondSession()">+ Add Session 2</button>';
     document.getElementById('fbRow').classList.add('hidden');
+    document.getElementById('locToggle').style.display = 'none';
   } else {
-    var day = WORKOUT_DAYS[currentDay];
+    var day = (homeMode==='home' && HOME_DAYS[currentDay]) ? HOME_DAYS[currentDay] : WORKOUT_DAYS[currentDay];
     document.getElementById('woSub').textContent = day.name;
     var h = '';
     day.ex.forEach(function(e){
@@ -831,6 +878,7 @@ function renderWorkout(){
       '</div></div>';
     area.innerHTML = h;
     document.getElementById('fbRow').classList.remove('hidden');
+    document.getElementById('locToggle').style.display = 'flex';
   }
   restoreDraft();
 }
