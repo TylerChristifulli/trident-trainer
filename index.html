@@ -182,7 +182,7 @@
     <h2>Program Settings</h2>
     <label>Program Start Date</label>
     <input type="date" id="startDate" onchange="setStartDate(this.value)">
-    <p class="note">12 weeks = two 6-week mesocycles (RP-style). Each meso: 5 weeks with intensity ramping from 3 RIR down to 0 RIR, then a deload. Lifting targets auto-progress using an estimated-1RM formula (Epley) from your logged sets — max out heavy one day and the app converts it to the right weight for the 6–10 rep range at this week's RIR. Set counts stay fixed; progress comes as reps and load.</p>
+    <p class="note">Kettlebell program, Pavel-style: every training day starts with a ~10-min stair warm-up, then the bell work. Reps are FIXED (10×10 swings is 10×10 swings) — you progress by owning the bell with crisp reps and short rest, then sizing up (+4 kg on presses, +8 kg on swings). The gold marks on each exercise show the classic standards: Pavel's &ldquo;Simple&rdquo; (32 kg) for swings and get-ups, the 24 kg ROP/snatch-test bell for presses and snatches. Deloads on weeks 6 and 12. Any barbell moves you add still use the estimated-1RM engine.</p>
   </div>
 
   <div class="card">
@@ -218,10 +218,10 @@
       <input type="date" id="logDate" style="width:auto">
     </div>
     <div class="daypick" id="dayPick">
-      <button data-day="d1" class="active">D1<br>Upper A</button>
-      <button data-day="s1">D2<br>Stairs</button>
-      <button data-day="d3">D3<br>Upper B</button>
-      <button data-day="s2">D4<br>Stairs</button>
+      <button data-day="k1" class="active">D1<br>S&amp;S</button>
+      <button data-day="k2">D2<br>Press</button>
+      <button data-day="k3">D3<br>Snatch</button>
+      <button data-day="k4">D4<br>S&amp;S+Core</button>
     </div>
     <div class="rirbanner" id="rirBanner"></div>
     <div class="loctoggle" id="locToggle">
@@ -349,8 +349,8 @@ function rirLabel(w){
 }
 function programWeek(w){
   w = Math.min(Math.max(w,1),12);
-  var floorBase = [50,60,70,80,90,60,100,110,125,135,150,95][w-1];
-  var vest      = [0,0,0,10,10,0,20,20,20,30,30,10][w-1];
+  var floorBase = [30,32,34,36,38,24,40,42,44,46,48,30][w-1];
+  var vest      = [0,0,0,0,10,0,10,10,20,20,20,0][w-1];
   var plank     = [60,75,90,105,120,80,135,150,165,180,200,120][w-1];
   var pullups   = [3,4,5,6,7,4,8,9,10,11,12,6][w-1];
   var pushups   = [30,35,40,45,50,35,55,60,65,70,80,45][w-1];
@@ -361,16 +361,18 @@ function programWeek(w){
     mesoWeek: mesoWeekOf(w),
     deload: isDeloadWeek(w),
     rir: rirLabel(w),
-    stairSessions: 2,
-    strengthSessions: 2,
+    stairSessions: 4,
+    strengthSessions: 4,
     floorsPerSession: floorBase,
     vest: vest,
     strength: [
-      {name:'Plank', val: plank+' sec'},
+      {name:'One-arm swings (S&S days)', val:'10 × 10'},
+      {name:'Turkish get-ups (S&S days)', val:'10 total'},
+      {name:'Clean & press (Day 2)', val:'2 ladders × (1-2-3)'},
+      {name:'Snatches (Day 3)', val:'10 × 5'},
       {name:'Pull-ups (per set ×3)', val: pullups+' reps'},
-      {name:'Push-ups (per set ×3)', val: pushups+' reps'},
-      {name:'Sit-ups (per set ×3)', val: situps+' reps'},
-      {name:'Flutter kicks 4-ct (per set ×2)', val: flutter+' reps'}
+      {name:'Push-ups finisher', val: pushups+' reps'},
+      {name:'Flutter kicks 4-ct', val: flutter+' reps'}
     ]
   };
 }
@@ -433,23 +435,23 @@ function renderPlan(){
   var h = '';
   h += tgt('Mesocycle', 'Meso '+mesoOf(viewWeek)+' &middot; Week '+p.mesoWeek+' of 6'+(p.deload?' — DELOAD':''));
   h += tgt('Lifting intensity', p.rir);
-  h += tgt('StairMaster sessions', p.stairSessions+'×/week');
-  h += tgt('Floors per session', p.floorsPerSession + (p.vest?(' @ '+p.vest+' lb vest'):''));
-  h += tgt('Strength/core sessions', p.strengthSessions+'×/week');
+  h += tgt('Daily stair warm-up', '~10 min · '+p.floorsPerSession+' floors'+(p.vest?' @ '+p.vest+' lb vest':''));
+  h += tgt('Kettlebell sessions', p.strengthSessions+'×/week');
   p.strength.forEach(function(s){ h += tgt(s.name, s.val); });
   document.getElementById('weekTargets').innerHTML = h;
 
   // completion vs current week
   var wl = logsInWeek(cw);
-  var stairDone = wl.filter(function(l){return l.type==='stairs';}).length;
+  var stairDone = wl.filter(function(l){return l.type==='stairs' || (l.warmup && l.warmup.floors);}).length;
   var strDone = wl.filter(function(l){return l.type==='strength';}).length;
   var pc = programWeek(cw);
-  var floorsDone = wl.filter(function(l){return l.type==='stairs';})
-                     .reduce(function(a,l){return a+(l.floors||0);},0);
+  var floorsDone = wl.reduce(function(a,l){
+    return a + (l.type==='stairs' ? (l.floors||0) : ((l.warmup && l.warmup.floors)||0));
+  },0);
   var floorsTarget = pc.floorsPerSession*pc.stairSessions;
   document.getElementById('weekCompletion').innerHTML =
-    compl('Stair sessions', stairDone, pc.stairSessions) +
-    compl('Strength sessions', strDone, pc.strengthSessions) +
+    compl('Stair warm-ups / climbs', stairDone, pc.stairSessions) +
+    compl('Kettlebell sessions', strDone, pc.strengthSessions) +
     compl('Total floors', floorsDone, floorsTarget);
 }
 function tgt(n,v){ return '<div class="target"><span class="name">'+n+'</span><span class="val">'+v+'</span></div>'; }
@@ -462,7 +464,7 @@ function compl(n,done,total){
 }
 
 /* ---------- RP-style progressive overload engine ---------- */
-var CORE_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Backpack rows'];
+var CORE_EX = ['One-arm swings','Turkish get-up','KB clean & press','KB snatch','Goblet squat','Renegade rows','KB windmill','Farmer carry','Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Backpack rows'];
 
 function weekOfDate(dateStr){
   var start = new Date(state.startDate+'T00:00:00');
@@ -506,6 +508,21 @@ function getRecommendation(exName){
   var lp = lastPerformance(exName);
   var bw = isBW(exName) ? currentBodyweight() : 0;
   var unit = (exName==='Plank (sec)') ? 'sec' : 'reps';
+  // Kettlebell moves: Pavel-style — reps are FIXED, progress = own the bell, then size up
+  var kb = KB_EX[exName];
+  if (kb){
+    var lastW = lp ? (lp.perf.entry.weight||0) : 0;
+    var kSets = kb.ladder ? 6 : kb.sets;
+    var kReps = kb.ladder ? 3 : kb.reps;
+    var dl = isDeloadWeek(cw);
+    if (dl) kSets = Math.max(2, Math.round(kSets/2));
+    var scheme = kb.ladder ? (kSets/3)+' ladders × (1-2-3)' : kSets+' × '+kReps;
+    return {sets:kSets, reps:kReps, weight:lastW||'', kbMove:true,
+      target: scheme + (lastW ? ' @ '+lastW+' lb bell' : '') + (dl ? ' — deload, keep it easy' : ''),
+      note: kb.note + (lastW
+        ? ' Same bell until every rep is crisp and rest feels short — then size up (+4 kg on presses, +8 kg on swings).'
+        : ' First time: pick a bell you fully own — crisp reps, zero grinding.')};
+  }
   if (isDeloadWeek(cw)){
     if (!lp) return {sets:2, reps:'', weight: bw||'', target:'2 easy sets, 4+ RIR',
                      note:'Deload week — 2 easy sets, 4+ RIR.'};
@@ -559,16 +576,36 @@ function getRecommendation(exName){
   return {sets:sets, reps:reps, weight:weight, target:target, note:note};
 }
 
-/* ---------- 4-day split: Upper A / Stairs / Upper B / Stairs ---------- */
+/* ---------- 4-day kettlebell rotation (Pavel / S&S style) ----------
+   Every day: 10-min stair warm-up, then the bell work. Fixed reps, crisp form,
+   never to failure — progress by owning the bell, then sizing up. */
 var WORKOUT_DAYS = {
-  d1:{name:'Day 1 — Upper Body A', ex:[
+  k1:{name:'Day 1 — Simple & Sinister', ex:[
+    {n:'One-arm swings', m:'Posterior chain'},
+    {n:'Turkish get-up', m:'Full body'}]},
+  k2:{name:'Day 2 — Clean & Press + PST', ex:[
+    {n:'KB clean & press', m:'Shoulders'},
+    {n:'Pull-ups', m:'Back'},
+    {n:'Push-ups', m:'Chest'}]},
+  k3:{name:'Day 3 — Snatch & Squat', ex:[
+    {n:'KB snatch', m:'Full body'},
+    {n:'Goblet squat', m:'Quads'},
+    {n:'Renegade rows', m:'Back'},
+    {n:'Farmer carry', m:'Grip'}]},
+  k4:{name:'Day 4 — S&S + Core', ex:[
+    {n:'One-arm swings', m:'Posterior chain'},
+    {n:'Turkish get-up', m:'Full body'},
+    {n:'KB windmill', m:'Core'},
+    {n:'Flutter kicks (4-ct)', m:'Core'}]},
+  // legacy barbell days — kept so the calendar can still show old sessions
+  d1:{name:'Legacy — Upper Body A', ex:[
     {n:'Pull-ups', m:'Back'},
     {n:'Bench press', m:'Chest'},
     {n:'Overhead press', m:'Shoulders'},
     {n:'Push-ups', m:'Chest'},
     {n:'Weighted sit-ups', m:'Core'},
     {n:'Hanging leg raises', m:'Core'}]},
-  d3:{name:'Day 3 — Upper Body B', ex:[
+  d3:{name:'Legacy — Upper Body B', ex:[
     {n:'Barbell row', m:'Back'},
     {n:'Dips', m:'Chest'},
     {n:'Push-ups', m:'Chest'},
@@ -576,8 +613,44 @@ var WORKOUT_DAYS = {
     {n:'Russian twists', m:'Core'},
     {n:'Plank (sec)', m:'Core'}]}
 };
+
+/* fixed-rep kettlebell prescriptions — Pavel doesn't chase rep PRs */
+var KB_EX = {
+  'One-arm swings':  {sets:10, reps:10, note:'Hard-style: hinge, snap the hips, bell floats chest-high. Switch hands each set.'},
+  'Turkish get-up':  {sets:10, reps:1,  note:'5 per side, slow and owned — eyes on the bell until you\'re standing.'},
+  'KB clean & press':{ladder:true,      note:'Rite of Passage ladders: 1, 2, 3 reps per arm. Rest, then next rung.'},
+  'KB snatch':       {sets:10, reps:5,  note:'One motion — hip snap, punch through at the top. 5 per hand per set.'},
+  'Goblet squat':    {sets:5,  reps:5,  note:'Bell at the chest, elbows pry the knees out, full depth.'},
+  'Renegade rows':   {sets:4,  reps:6,  note:'Plank on the bells, row without the hips twisting. 6 per arm.'},
+  'KB windmill':     {sets:6,  reps:3,  note:'3 per side, alternate sides each set. Hips back, eyes locked on the bell.'},
+  'Farmer carry':    {sets:5,  reps:1,  note:'1 rep = ~40 yards. Heavy, tall posture, no leaning.'}
+};
 /* home / hotel versions — same muscles, zero equipment (a backpack at most) */
 var HOME_DAYS = {
+  k1:{name:'Day 1 — Bodyweight (Home)', ex:[
+    {n:'Inverted rows (table/towel)', m:'Back'},
+    {n:'Decline push-ups', m:'Chest'},
+    {n:'Pike push-ups', m:'Shoulders'},
+    {n:'Sit-ups', m:'Core'},
+    {n:'Lying leg raises', m:'Core'}]},
+  k2:{name:'Day 2 — Bodyweight (Home)', ex:[
+    {n:'Backpack rows', m:'Back'},
+    {n:'Chair dips', m:'Chest'},
+    {n:'Push-ups', m:'Chest'},
+    {n:'Flutter kicks (4-ct)', m:'Core'},
+    {n:'Plank (sec)', m:'Core'}]},
+  k3:{name:'Day 3 — Bodyweight (Home)', ex:[
+    {n:'Inverted rows (table/towel)', m:'Back'},
+    {n:'Decline push-ups', m:'Chest'},
+    {n:'Pike push-ups', m:'Shoulders'},
+    {n:'Russian twists', m:'Core'},
+    {n:'Lying leg raises', m:'Core'}]},
+  k4:{name:'Day 4 — Bodyweight (Home)', ex:[
+    {n:'Backpack rows', m:'Back'},
+    {n:'Chair dips', m:'Chest'},
+    {n:'Push-ups', m:'Chest'},
+    {n:'Flutter kicks (4-ct)', m:'Core'},
+    {n:'V-ups', m:'Core'}]},
   d1:{name:'Day 1 — Upper Body A (Home)', ex:[
     {n:'Inverted rows (table/towel)', m:'Back'},
     {n:'Decline push-ups', m:'Chest'},
@@ -596,7 +669,8 @@ var HOME_DAYS = {
 var homeMode = 'gym';
 try { homeMode = localStorage.getItem('tridentLoc') || 'gym'; } catch(e){}
 
-var DAY_LABELS = {d1:'DAY 1', s1:'DAY 2', d3:'DAY 3', s2:'DAY 4'};
+var DAY_LABELS = {k1:'DAY 1', k2:'DAY 2', k3:'DAY 3', k4:'DAY 4',
+                  d1:'DAY 1', s1:'DAY 2', d3:'DAY 3', s2:'DAY 4'};
 
 /* ---------- exercise form cues + demo links ---------- */
 var EX_INFO = {
@@ -624,7 +698,15 @@ var EX_INFO = {
   'Pike push-ups':'Hips high in an upside-down V, lower your head between your hands. An overhead press with no barbell.',
   'Chair dips':'Hands on a chair edge behind you, legs stretched out, lower to 90° elbows and press up.',
   'Lying leg raises':'Flat on your back, legs straight to vertical, lower slowly without letting your back arch.',
-  'Backpack rows':'Stuff a backpack heavy (books, water bottles), hinge flat-back, row it to your hip. One arm on the chair works too.'
+  'Backpack rows':'Stuff a backpack heavy (books, water bottles), hinge flat-back, row it to your hip. One arm on the chair works too.',
+  'One-arm swings':'Hike the bell back, snap the hips — the bell floats to chest height. Arms are ropes; all power is hips. Switch hands each set.',
+  'Turkish get-up':'Press the bell up, then stand in stages — elbow, hand, bridge, lunge, stand — and reverse back down. Eyes on the bell. Slow is the point.',
+  'KB clean & press':'Clean to the rack without banging the forearm, crush the handle, brace, press with the lat locked in.',
+  'KB snatch':'A swing that ends overhead in one motion — punch through at the top so the bell lands soft on your wrist.',
+  'Goblet squat':'Hold the bell by the horns at your chest, sit down between your heels, elbows prying the knees out.',
+  'Renegade rows':'Push-up plank on two bells, feet wide for base. Row one bell to the hip without letting the hips rotate an inch.',
+  'KB windmill':'Bell locked out overhead, push the hips toward that side, hinge down along the inside leg. Eyes on the bell the entire way.',
+  'Farmer carry':'One or two heavy bells, tall spine, crush grip, brisk walk ~40 yards. Set down with a hinge, not a slump.'
 };
 function exDemoLink(name){
   var q = name.replace(/\s*\(.*\)/,'') + ' proper form';
@@ -645,6 +727,13 @@ var BENCHMARKS = {
   'V-ups':                {avg:10,  top:40,  aL:'Avg man', tL:'SEAL-fit'},
   'Dips':                 {avg:3,   top:20,  aL:'Avg man', tL:'SEAL-fit'},
   'Russian twists':       {avg:20,  top:60,  aL:'Avg man', tL:'SEAL-fit'},
+  'One-arm swings':   {bell:true, avg:35, top:70, aL:'Typical man', tL:'Pavel &ldquo;Simple&rdquo; (32 kg)'},
+  'Turkish get-up':   {bell:true, avg:26, top:70, aL:'Typical man', tL:'Pavel &ldquo;Simple&rdquo; (32 kg)'},
+  'KB clean & press': {bell:true, avg:35, top:53, aL:'Typical man', tL:'ROP bell (24 kg)'},
+  'KB snatch':        {bell:true, avg:35, top:53, aL:'Typical man', tL:'Snatch-test bell (24 kg)'},
+  'Goblet squat':     {bell:true, avg:35, top:70, aL:'Typical man', tL:'32 kg'},
+  'KB windmill':      {bell:true, avg:26, top:53, aL:'Typical man', tL:'24 kg'},
+  'Renegade rows':    {bell:true, avg:26, top:53, aL:'Typical man', tL:'24 kg pair'},
   'Bench press':          {ratio:true, avg:0.75, top:1.5,  aL:'Avg lifter', tL:'Advanced'},
   'Overhead press':       {ratio:true, avg:0.5,  top:1.0,  aL:'Avg lifter', tL:'Advanced'},
   'Barbell row':          {ratio:true, avg:0.7,  top:1.25, aL:'Avg lifter', tL:'Advanced'}
@@ -664,9 +753,13 @@ function bestPerformance(name, ratio){
 }
 function benchmarkHTML(name){
   var b = BENCHMARKS[name]; if (!b) return '';
-  var you = bestPerformance(name, !!b.ratio);
+  var you = bestPerformance(name, !!b.ratio || !!b.bell);
   var youVal, youTxt, unit;
-  if (b.ratio){
+  if (b.bell){
+    youVal = you || 0;
+    youTxt = you ? you+' lb bell' : 'no data yet';
+    unit = ' lb';
+  } else if (b.ratio){
     var bw = currentBodyweight();
     if (!bw) return '<div class="cmptext">Log your body weight (Plan tab) to unlock strength comparisons.</div>';
     youVal = you ? you/bw : 0;
@@ -739,7 +832,7 @@ function sbSaveBw(){
   });
 }
 function isStairsDay(d){ return d.charAt(0)==='s'; }
-var currentDay = 'd1';
+var currentDay = 'k1';
 
 /* ---------- workout view ---------- */
 function selectDay(d){
@@ -770,19 +863,21 @@ document.querySelectorAll('#locToggle button').forEach(function(x){
    Train 4 days in 3 days or in 10, the cycle just keeps rolling: d1 → s1 → d3 → s2 → d1...
    Resumes an unfinished strength session from today first. */
 function nextWorkoutDay(){
-  var order = ['d1','s1','d3','s2'];
+  var order = ['k1','k2','k3','k4'];
+  var legacyNext = {d1:'k2', s1:'k3', d3:'k4', s2:'k1'};
   var today = todayStr();
   for (var i=state.logs.length-1; i>=0; i--){
     var l = state.logs[i];
-    if (l.date===today && l.type==='strength' && !l.feedback && l.day) return l.day;
+    if (l.date===today && l.type==='strength' && !l.feedback && l.day && order.indexOf(l.day)!==-1) return l.day;
   }
   for (var j=state.logs.length-1; j>=0; j--){
     var last = state.logs[j];
     if (last.day && order.indexOf(last.day) !== -1){
       return order[(order.indexOf(last.day)+1) % order.length];
     }
+    if (last.day && legacyNext[last.day]) return legacyNext[last.day];
   }
-  return 'd1';
+  return 'k1';
 }
 
 function setRowHTML(name, wtVal, rpVal){
@@ -806,7 +901,11 @@ function exCard(name, muscle, r){
   var n = r.sets || 3;
   var isTime = (name==='Plank (sec)');
   var bwMove = isBW(name);
-  for (var i=0;i<n;i++){ rows += setRowHTML(name, r.weight, fatigueReps(r.reps, i, bwMove)); }
+  var kbx = KB_EX[name];
+  for (var i=0;i<n;i++){
+    var rp = kbx ? (kbx.ladder ? [1,2,3][i%3] : r.reps) : fatigueReps(r.reps, i, bwMove);
+    rows += setRowHTML(name, r.weight, rp);
+  }
   var info = EX_INFO[name] ? '<div class="howto">'+EX_INFO[name]+
     ' <a href="'+exDemoLink(name)+'" target="_blank" rel="noopener">Watch demo &#9654;</a></div>' : '';
   return '<div class="card excard" data-ex="'+name+'">'+
@@ -869,6 +968,17 @@ function renderWorkout(){
     var day = (homeMode==='home' && HOME_DAYS[currentDay]) ? HOME_DAYS[currentDay] : WORKOUT_DAYS[currentDay];
     document.getElementById('woSub').textContent = day.name;
     var h = '';
+    if (currentDay.charAt(0)==='k'){
+      var pw = programWeek(cw);
+      h += '<div class="card excard" id="warmupCard">'+
+        '<span class="chip">WARM-UP</span><h3>StairMaster — 10 min</h3>'+
+        '<div class="reco">&#9654; Target: ~'+pw.floorsPerSession+' floors in 10 min'+
+        (pw.vest?' @ '+pw.vest+' lb vest':'')+', then grab the bell.</div>'+
+        '<div class="row">'+
+        '<div><label>Floors</label><input type="number" id="wFloors" placeholder="e.g. '+pw.floorsPerSession+'"></div>'+
+        '<div><label>Minutes</label><input type="number" id="wMin" placeholder="10"></div>'+
+        '</div></div>';
+    }
     day.ex.forEach(function(e){
       h += exCard(e.n, e.m, getRecommendation(e.n));
     });
@@ -1099,9 +1209,13 @@ function autoSave(){
     draft.sessions = sessions;
   } else {
     var exs = collectStrength();
-    if (!exs.length){ if (draft) removeDraft(draft); return; }
+    var wfEl = document.getElementById('wFloors');
+    var wfl = wfEl ? (parseInt(wfEl.value)||0) : 0;
+    var wmn = wfEl ? (parseInt(document.getElementById('wMin').value)||0) : 0;
+    if (!exs.length && !wfl){ if (draft) removeDraft(draft); return; }
     if (!draft){ draft = {id: Date.now(), date: date, type:'strength', day: currentDay}; state.logs.push(draft); }
     draft.exercises = exs;
+    if (wfl || wmn){ draft.warmup = {floors:wfl, minutes:wmn}; } else { delete draft.warmup; }
   }
   draft.notes = document.getElementById('logNotes').value.trim();
   state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
@@ -1136,6 +1250,13 @@ function restoreDraft(){
     });
   } else {
     var area = document.getElementById('workoutArea');
+    if (draft.warmup){
+      var wfEl2 = document.getElementById('wFloors');
+      if (wfEl2){
+        if (draft.warmup.floors) wfEl2.value = draft.warmup.floors;
+        if (draft.warmup.minutes) document.getElementById('wMin').value = draft.warmup.minutes;
+      }
+    }
     (draft.exercises||[]).forEach(function(e){
       var card = area.querySelector('.excard[data-ex="'+e.name+'"]');
       if (!card){
@@ -1257,6 +1378,27 @@ var EX_FACTS = {
   ],
   'V-ups': [
     'V-ups hit upper and lower abs at once — double pay for the same rep.'
+  ],
+  'One-arm swings': [
+    'Pavel\'s "Simple" standard: 100 one-arm swings with a 32 kg bell in 5 minutes — calm breathing between sets.',
+    'Hard-style swings train the exact hip snap that powers jumps, sprints, and stair climbs.'
+  ],
+  'Turkish get-up': [
+    'Old strongman lore: students weren\'t taught another lift until they could get-up with 100 lb.',
+    'The get-up works every stabilizer you own — Pavel calls it loaded yoga.'
+  ],
+  'KB snatch': [
+    'The classic SFG snatch test: 100 snatches with the 24 kg bell in 5 minutes.',
+    'The snatch is called the Tsar of kettlebell lifts — total-body power in one motion.'
+  ],
+  'KB clean & press': [
+    'Pavel\'s Rite of Passage goal: pressing a bell close to half your bodyweight.'
+  ],
+  'KB windmill': [
+    'Windmills build the side-body armor that keeps rucks and carries from folding you.'
+  ],
+  'Renegade rows': [
+    'Renegade rows are a plank fighting a row at the same time — anti-rotation gold.'
   ]
 };
 var motivBag = [];
@@ -1343,16 +1485,17 @@ function refreshBars(){
     var name = card.dataset.ex, b = BENCHMARKS[name];
     if (!b) return;
     var fill = card.querySelector('.cmpfill'); if (!fill) return;
-    var ratio = !!b.ratio, bw = currentBodyweight();
+    var ratio = !!b.ratio, bell = !!b.bell, bw = currentBodyweight();
     if (ratio && !bw) return;
-    var you = bestPerformance(name, ratio);
+    var you = bestPerformance(name, ratio || bell);
     var val = ratio ? (you ? you/bw : 0) : you;
     var w = Math.min(100, Math.round(val/(b.top*1.2)*100)) + '%';
     if (fill.style.width !== w){
       fill.style.width = w;
       var bEl = card.querySelector('.cmptext b');
-      if (bEl && you) bEl.textContent = ratio ? (you+' lb ('+val.toFixed(2)+'×BW)')
-                                              : (you + (name==='Plank (sec)' ? ' sec' : ' reps'));
+      if (bEl && you) bEl.textContent = bell ? (you+' lb bell')
+                                       : ratio ? (you+' lb ('+val.toFixed(2)+'×BW)')
+                                       : (you + (name==='Plank (sec)' ? ' sec' : ' reps'));
     }
   });
 }
@@ -1371,12 +1514,18 @@ function showHooyah(log){
       '<div class="cmpbar"><div class="cmpfill hyfill" data-w="'+Math.min(100,pctT)+'" style="width:0%"></div></div>'+
       '<div class="hytext">'+br+log.floors+' total floors'+(log.vest?' @ '+log.vest+' lb vest':'')+' &middot; '+pctT+'% of today\'s '+p.floorsPerSession+'-floor target</div></div>';
   } else {
+    if (log.warmup && log.warmup.floors){
+      rows += '<div class="hyrow"><div class="hyname">Stair warm-up</div>'+
+        '<div class="hytext">'+log.warmup.floors+' floors'+
+        (log.warmup.minutes ? ' in '+log.warmup.minutes+' min' : '')+'</div></div>';
+    }
     (log.exercises||[]).forEach(function(e){
       var b = BENCHMARKS[e.name]; if (!b) return;
-      var ratio = !!b.ratio, bw = currentBodyweight();
+      var ratio = !!b.ratio, bell = !!b.bell, bw = currentBodyweight();
       if (ratio && !bw) return;
-      var oldBest = bestPerformanceExcluding(e.name, ratio, log);
-      var thisBest = ratio ? e.weight : e.reps;
+      var weightBased = ratio || bell;
+      var oldBest = bestPerformanceExcluding(e.name, weightBased, log);
+      var thisBest = weightBased ? e.weight : e.reps;
       var newBest = Math.max(oldBest, thisBest);
       var max = b.top*1.2;
       var oldVal = ratio ? oldBest/bw : oldBest;
@@ -1384,7 +1533,7 @@ function showHooyah(log){
       var oldPct = Math.min(100, Math.round(oldVal/max*100));
       var newPct = Math.min(100, Math.round(newVal/max*100));
       var pctSeal = Math.min(999, Math.round(newVal/b.top*100));
-      var unit = e.name==='Plank (sec)' ? ' sec' : (ratio ? '×BW' : ' reps');
+      var unit = e.name==='Plank (sec)' ? ' sec' : (bell ? ' lb' : (ratio ? '×BW' : ' reps'));
       rows += '<div class="hyrow"><div class="hyname">'+e.name+
         (newBest>oldBest && oldBest>0 ? ' <span class="pbtag">NEW BEST</span>' : '')+'</div>'+
         '<div class="cmpbar"><div class="cmpfill hyfill" data-w="'+newPct+'" style="width:'+oldPct+'%"></div>'+
@@ -1405,7 +1554,7 @@ function showHooyah(log){
 }
 function weekComplete(){
   var wl = logsInWeek(currentWeek());
-  return ['d1','s1','d3','s2'].every(function(d){
+  return ['k1','k2','k3','k4'].every(function(d){
     return wl.some(function(l){ return l.day===d; });
   });
 }
@@ -1415,11 +1564,14 @@ function showWeekSummary(){
   var floors=0, mins=0, sets=0, reps=0;
   wl.forEach(function(l){
     if (l.type==='stairs'){ floors += l.floors||0; mins += l.minutes||0; }
-    else (l.exercises||[]).forEach(function(e){
-      sets += e.sets;
-      if (e.setDetails) e.setDetails.forEach(function(s){ reps += s.reps; });
-      else reps += e.sets*e.reps;
-    });
+    else {
+      if (l.warmup){ floors += l.warmup.floors||0; mins += l.warmup.minutes||0; }
+      (l.exercises||[]).forEach(function(e){
+        sets += e.sets;
+        if (e.setDetails) e.setDetails.forEach(function(s){ reps += s.reps; });
+        else reps += e.sets*e.reps;
+      });
+    }
   });
   // count new personal bests set this week
   var start = weekRange(cw)[0];
@@ -1541,8 +1693,9 @@ function removeLog(id){
 
 /* ---------- progress ---------- */
 function renderProgress(){
-  var stairs = state.logs.filter(function(l){return l.type==='stairs';});
-  var totalFloors = stairs.reduce(function(a,l){return a+(l.floors||0);},0);
+  var stairs = state.logs.filter(function(l){return l.type==='stairs' || (l.warmup && l.warmup.floors);});
+  function flOf(l){ return l.type==='stairs' ? (l.floors||0) : (l.warmup.floors||0); }
+  var totalFloors = stairs.reduce(function(a,l){return a+flOf(l);},0);
   document.getElementById('statFloors').textContent = totalFloors;
   document.getElementById('statSessions').textContent = state.logs.length;
 
@@ -1554,7 +1707,7 @@ function renderProgress(){
   document.getElementById('statStreak').textContent = streak;
 
   drawLine('chartFloors',
-    stairs.map(function(l){return l.floors;}),
+    stairs.map(flOf),
     stairs.map(function(l){return l.date.slice(5);}));
 
   var vols=[], labels=[];
