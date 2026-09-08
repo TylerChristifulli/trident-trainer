@@ -371,7 +371,7 @@ function programWeek(w){
       {name:'Clean & press (Day 2)', val:'2 ladders × (1-2-3)'},
       {name:'Snatches (Day 3)', val:'10 × 5'},
       {name:'Pull-ups (per set ×3)', val: pullups+' reps'},
-      {name:'Push-ups finisher', val: pushups+' reps'},
+      {name:'Dead stop push-ups finisher', val: pushups+' reps'},
       {name:'Flutter kicks 4-ct', val: flutter+' reps'}
     ]
   };
@@ -464,7 +464,7 @@ function compl(n,done,total){
 }
 
 /* ---------- RP-style progressive overload engine ---------- */
-var CORE_EX = ['One-arm swings','Turkish get-up','KB clean & press','KB snatch','Goblet squat','Renegade rows','KB windmill','Farmer carry','Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Backpack rows'];
+var CORE_EX = ['One-arm swings','Turkish get-up','KB clean & press','KB snatch','Goblet squat','Renegade rows','KB windmill','Farmer carry','Plank (sec)','Pull-ups','Push-ups','Dead stop push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Backpack rows'];
 
 function weekOfDate(dateStr){
   var start = new Date(state.startDate+'T00:00:00');
@@ -482,6 +482,12 @@ function feedbackAdj(fb){
   return 0;
 }
 
+var EX_ALIAS = {'Dead stop push-ups':['Push-ups']};
+function exMatch(entryName, exName){
+  if (entryName===exName) return true;
+  var a = EX_ALIAS[exName];
+  return !!(a && a.indexOf(entryName)!==-1);
+}
 /* Last performance of an exercise (skipping deload-week sessions),
    restricted to the current mesocycle so sets reset each meso. */
 function lastPerformance(exName){
@@ -494,7 +500,7 @@ function lastPerformance(exName){
     if (l.date === sessionDate) continue; // never base targets on today's own in-progress sets
     var lw = weekOfDate(l.date);
     if (isDeloadWeek(lw)) continue;
-    var e = (l.exercises||[]).find(function(x){return x.name===exName;});
+    var e = (l.exercises||[]).find(function(x){return exMatch(x.name, exName);});
     if (e){ best = {entry:e, log:l, week:lw}; sameMeso = (mesoOf(lw)===meso); break; }
   }
   return best ? {perf:best, sameMeso:sameMeso} : null;
@@ -518,7 +524,7 @@ function getRecommendation(exName){
     if (dl) kSets = Math.max(2, Math.round(kSets/2));
     var scheme = kb.ladder ? (kSets/3)+' ladders × (1-2-3)' : kSets+' × '+kReps;
     return {sets:kSets, reps:kReps, weight:lastW||'', kbMove:true,
-      target: scheme + (lastW ? ' @ '+lastW+' lb bell' : '') + (dl ? ' — deload, keep it easy' : ''),
+      target: scheme + (lastW ? ' @ '+lastW+' kg bell' : '') + (dl ? ' — deload, keep it easy' : ''),
       note: kb.note + (lastW
         ? ' Same bell until every rep is crisp and rest feels short — then size up (+4 kg on presses, +8 kg on swings).'
         : ' First time: pick a bell you fully own — crisp reps, zero grinding.')};
@@ -586,7 +592,7 @@ var WORKOUT_DAYS = {
   k2:{name:'Day 2 — Clean & Press + PST', ex:[
     {n:'KB clean & press', m:'Shoulders'},
     {n:'Pull-ups', m:'Back'},
-    {n:'Push-ups', m:'Chest'}]},
+    {n:'Dead stop push-ups', m:'Chest'}]},
   k3:{name:'Day 3 — Snatch & Squat', ex:[
     {n:'KB snatch', m:'Full body'},
     {n:'Goblet squat', m:'Quads'},
@@ -636,7 +642,7 @@ var HOME_DAYS = {
   k2:{name:'Day 2 — Bodyweight (Home)', ex:[
     {n:'Backpack rows', m:'Back'},
     {n:'Chair dips', m:'Chest'},
-    {n:'Push-ups', m:'Chest'},
+    {n:'Dead stop push-ups', m:'Chest'},
     {n:'Flutter kicks (4-ct)', m:'Core'},
     {n:'Plank (sec)', m:'Core'}]},
   k3:{name:'Day 3 — Bodyweight (Home)', ex:[
@@ -648,7 +654,7 @@ var HOME_DAYS = {
   k4:{name:'Day 4 — Bodyweight (Home)', ex:[
     {n:'Backpack rows', m:'Back'},
     {n:'Chair dips', m:'Chest'},
-    {n:'Push-ups', m:'Chest'},
+    {n:'Dead stop push-ups', m:'Chest'},
     {n:'Flutter kicks (4-ct)', m:'Core'},
     {n:'V-ups', m:'Core'}]},
   d1:{name:'Day 1 — Upper Body A (Home)', ex:[
@@ -677,6 +683,7 @@ var EX_INFO = {
   'Plank (sec)':'Forearms down, straight line head to heels. Brace abs and squeeze glutes — no sagging hips.',
   'Pull-ups':'Dead hang to chin over the bar. Full extension at the bottom, no kipping or swinging.',
   'Push-ups':'Rigid plank body, hands under shoulders. Chest to deck, full lockout every rep.',
+  'Dead stop push-ups':'Lower all the way until chest and thighs rest on the deck, lift both hands off the floor for a beat, replace them and press back up. Zero bounce, zero momentum — every rep starts from a dead stop.',
   'Sit-ups':'Feet anchored, hands crossed on chest. Up until elbows touch thighs, controlled down.',
   'Flutter kicks (4-ct)':'On your back, legs straight, heels 6 inches off deck. Small alternating kicks — 4 kicks = 1 rep. Press lower back into the floor.',
   'Hanging leg raises':'Hang from the bar, raise straight legs to hip height or above. No swinging between reps.',
@@ -719,6 +726,7 @@ function exDemoLink(name){
 var BENCHMARKS = {
   'Pull-ups':             {avg:2,   top:18,  aL:'Avg man', tL:'SEAL competitive', extra:'PST min: 10'},
   'Push-ups':             {avg:20,  top:90,  aL:'Avg man', tL:'SEAL competitive', extra:'PST min: 42 in 2 min'},
+  'Dead stop push-ups':   {avg:15,  top:70,  aL:'Avg man', tL:'SEAL competitive', extra:'No stretch reflex — harder than PST style'},
   'Sit-ups':              {avg:25,  top:90,  aL:'Avg man', tL:'SEAL competitive', extra:'PST min: 50 in 2 min'},
   'Weighted sit-ups':     {avg:12,  top:40,  aL:'Avg man', tL:'SEAL-fit'},
   'Plank (sec)':          {avg:60,  top:240, aL:'Avg man', tL:'SEAL-fit'},
@@ -727,13 +735,13 @@ var BENCHMARKS = {
   'V-ups':                {avg:10,  top:40,  aL:'Avg man', tL:'SEAL-fit'},
   'Dips':                 {avg:3,   top:20,  aL:'Avg man', tL:'SEAL-fit'},
   'Russian twists':       {avg:20,  top:60,  aL:'Avg man', tL:'SEAL-fit'},
-  'One-arm swings':   {bell:true, avg:35, top:70, aL:'Typical man', tL:'Pavel &ldquo;Simple&rdquo; (32 kg)'},
-  'Turkish get-up':   {bell:true, avg:26, top:70, aL:'Typical man', tL:'Pavel &ldquo;Simple&rdquo; (32 kg)'},
-  'KB clean & press': {bell:true, avg:35, top:53, aL:'Typical man', tL:'ROP bell (24 kg)'},
-  'KB snatch':        {bell:true, avg:35, top:53, aL:'Typical man', tL:'Snatch-test bell (24 kg)'},
-  'Goblet squat':     {bell:true, avg:35, top:70, aL:'Typical man', tL:'32 kg'},
-  'KB windmill':      {bell:true, avg:26, top:53, aL:'Typical man', tL:'24 kg'},
-  'Renegade rows':    {bell:true, avg:26, top:53, aL:'Typical man', tL:'24 kg pair'},
+  'One-arm swings':   {bell:true, avg:16, top:32, aL:'Typical man', tL:'Pavel &ldquo;Simple&rdquo; (32 kg)'},
+  'Turkish get-up':   {bell:true, avg:12, top:32, aL:'Typical man', tL:'Pavel &ldquo;Simple&rdquo; (32 kg)'},
+  'KB clean & press': {bell:true, avg:16, top:24, aL:'Typical man', tL:'ROP bell (24 kg)'},
+  'KB snatch':        {bell:true, avg:16, top:24, aL:'Typical man', tL:'Snatch-test bell (24 kg)'},
+  'Goblet squat':     {bell:true, avg:16, top:32, aL:'Typical man', tL:'32 kg'},
+  'KB windmill':      {bell:true, avg:12, top:24, aL:'Typical man', tL:'24 kg'},
+  'Renegade rows':    {bell:true, avg:12, top:24, aL:'Typical man', tL:'24 kg pair'},
   'Bench press':          {ratio:true, avg:0.75, top:1.5,  aL:'Avg lifter', tL:'Advanced'},
   'Overhead press':       {ratio:true, avg:0.5,  top:1.0,  aL:'Avg lifter', tL:'Advanced'},
   'Barbell row':          {ratio:true, avg:0.7,  top:1.25, aL:'Avg lifter', tL:'Advanced'}
@@ -743,7 +751,7 @@ function bestPerformance(name, ratio){
   state.logs.forEach(function(l){
     if (l.type!=='strength') return;
     (l.exercises||[]).forEach(function(e){
-      if (e.name!==name) return;
+      if (!exMatch(e.name, name)) return;
       if (ratio){ if (e.weight>best) best = e.weight; }
       else if (e.setDetails){ e.setDetails.forEach(function(s){ if (s.reps>best) best = s.reps; }); }
       else if (e.reps>best){ best = e.reps; }
@@ -757,8 +765,8 @@ function benchmarkHTML(name){
   var youVal, youTxt, unit;
   if (b.bell){
     youVal = you || 0;
-    youTxt = you ? you+' lb bell' : 'no data yet';
-    unit = ' lb';
+    youTxt = you ? you+' kg bell' : 'no data yet';
+    unit = ' kg';
   } else if (b.ratio){
     var bw = currentBodyweight();
     if (!bw) return '<div class="cmptext">Log your body weight (Plan tab) to unlock strength comparisons.</div>';
@@ -785,7 +793,7 @@ function benchmarkHTML(name){
 }
 
 /* ---------- body weight tracking ---------- */
-var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises'];
+var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Dead stop push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises'];
 function isBW(name){ return BW_EX.indexOf(name) !== -1; }
 function currentBodyweight(){
   if (!state.bw.length) return 0;
@@ -882,8 +890,9 @@ function nextWorkoutDay(){
 
 function setRowHTML(name, wtVal, rpVal){
   var isTime = (name==='Plank (sec)');
+  var wUnit = KB_EX[name] ? 'kg' : 'lb';
   return '<div class="setrow">'+
-    '<input type="number" class="wt" placeholder="lb" value="'+(wtVal||'')+'">'+
+    '<input type="number" class="wt" placeholder="'+wUnit+'" value="'+(wtVal||'')+'">'+
     '<input type="number" class="rp" placeholder="'+(isTime?'sec':'reps')+'" value="'+(rpVal||'')+'">'+
     '<input type="checkbox" class="ck">'+
     '<button class="sdel" onclick="delSet(this)" title="Delete set">&times;</button>'+
@@ -916,7 +925,7 @@ function exCard(name, muscle, r){
     benchmarkHTML(name)+
     (r.target ? '<div class="tgtline">TARGET: '+r.target+'</div>' : '')+
     '<div class="reco">&#9654; '+r.note+'</div>'+
-    '<div class="sethead"><span>Weight</span><span>'+(isTime?'Seconds':'Reps')+'</span><span>Log</span><span></span></div>'+
+    '<div class="sethead"><span>Weight'+(kbx?' (kg)':' (lb)')+'</span><span>'+(isTime?'Seconds':'Reps')+'</span><span>Log</span><span></span></div>'+
     rows+
     '<button class="addset" onclick="addSet(this)">+ Add Set</button>'+
     '</div>';
@@ -1213,7 +1222,7 @@ function autoSave(){
     var wfl = wfEl ? (parseInt(wfEl.value)||0) : 0;
     var wmn = wfEl ? (parseInt(document.getElementById('wMin').value)||0) : 0;
     if (!exs.length && !wfl){ if (draft) removeDraft(draft); return; }
-    if (!draft){ draft = {id: Date.now(), date: date, type:'strength', day: currentDay}; state.logs.push(draft); }
+    if (!draft){ draft = {id: Date.now(), date: date, type:'strength', day: currentDay, kbkg:1}; state.logs.push(draft); }
     draft.exercises = exs;
     if (wfl || wmn){ draft.warmup = {floors:wfl, minutes:wmn}; } else { delete draft.warmup; }
   }
@@ -1340,6 +1349,10 @@ var EX_FACTS = {
     'Minoru Yoshida did 10,507 push-ups NON-STOP in 1980. Your set just started.',
     'SEAL competitive pace is 90+ push-ups in 2 minutes.'
   ],
+  'Dead stop push-ups': [
+    'Dead stop reps remove the stretch reflex — every rep is pure starting strength, the same quality a punch or a sprint start needs.',
+    'Resting the chest on the deck each rep makes half reps impossible — the most honest push-up there is.'
+  ],
   'Bench press': [
     'The heaviest raw bench press on record is over 780 lb (Julius Maddox).',
     'With bench shirts, humans have benched over 1,300 lb. Physics weeps.',
@@ -1437,11 +1450,11 @@ function showExHistory(name){
   for (var i=state.logs.length-1; i>=0 && items.length<6; i--){
     var l = state.logs[i];
     if (l.type!=='strength') continue;
-    var e = (l.exercises||[]).filter(function(x){return x.name===name;})[0];
+    var e = (l.exercises||[]).filter(function(x){return exMatch(x.name, name);})[0];
     if (!e) continue;
     var d = e.setDetails
       ? e.setDetails.map(function(s){ return (s.weight?s.weight+'×':'')+s.reps; }).join(', ')
-      : e.sets+'×'+e.reps+(e.weight?' @ '+e.weight+' lb':'');
+      : e.sets+'×'+e.reps+(e.weight?' @ '+e.weight+(KB_EX[e.name]?' kg':' lb'):'');
     items.push('<div class="ehrow"><span class="ehdate">'+l.date+'</span><span>'+d+'</span></div>');
   }
   document.getElementById('ehTitle').textContent = name;
@@ -1472,7 +1485,7 @@ function bestPerformanceExcluding(name, ratio, excludeLog){
   state.logs.forEach(function(l){
     if (l === excludeLog || l.type!=='strength') return;
     (l.exercises||[]).forEach(function(e){
-      if (e.name!==name) return;
+      if (!exMatch(e.name, name)) return;
       if (ratio){ if (e.weight>best) best = e.weight; }
       else if (e.setDetails){ e.setDetails.forEach(function(s){ if (s.reps>best) best = s.reps; }); }
       else if (e.reps>best){ best = e.reps; }
@@ -1493,7 +1506,7 @@ function refreshBars(){
     if (fill.style.width !== w){
       fill.style.width = w;
       var bEl = card.querySelector('.cmptext b');
-      if (bEl && you) bEl.textContent = bell ? (you+' lb bell')
+      if (bEl && you) bEl.textContent = bell ? (you+' kg bell')
                                        : ratio ? (you+' lb ('+val.toFixed(2)+'×BW)')
                                        : (you + (name==='Plank (sec)' ? ' sec' : ' reps'));
     }
@@ -1533,7 +1546,7 @@ function showHooyah(log){
       var oldPct = Math.min(100, Math.round(oldVal/max*100));
       var newPct = Math.min(100, Math.round(newVal/max*100));
       var pctSeal = Math.min(999, Math.round(newVal/b.top*100));
-      var unit = e.name==='Plank (sec)' ? ' sec' : (bell ? ' lb' : (ratio ? '×BW' : ' reps'));
+      var unit = e.name==='Plank (sec)' ? ' sec' : (bell ? ' kg' : (ratio ? '×BW' : ' reps'));
       rows += '<div class="hyrow"><div class="hyname">'+e.name+
         (newBest>oldBest && oldBest>0 ? ' <span class="pbtag">NEW BEST</span>' : '')+'</div>'+
         '<div class="cmpbar"><div class="cmpfill hyfill" data-w="'+newPct+'" style="width:'+oldPct+'%"></div>'+
@@ -1676,7 +1689,7 @@ function renderHistory(){
           if (e.setDetails) return e.name+': '+e.setDetails.map(function(s){
             return (s.weight?s.weight+'×':'')+s.reps;
           }).join(', ');
-          return e.name+' '+e.sets+'×'+e.reps+(e.weight?' @ '+e.weight+' lb':'');
+          return e.name+' '+e.sets+'×'+e.reps+(e.weight?' @ '+e.weight+(KB_EX[e.name]?' kg':' lb'):'');
         }).join('<br>');
     return '<div class="histitem">'+
       '<div class="top"><span class="date">'+l.date+'</span>'+
@@ -1840,6 +1853,7 @@ async function initSupabase(){
     if (res.error) throw res.error;
     state.logs = res.data.map(function(r){ return r.data; });
     state.logs.sort(function(a,b){ return a.date<b.date?-1:1; });
+    migrateKbKg();
     var s = await sbClient.from('settings').select('*').eq('key','startDate').maybeSingle();
     if (s.data && s.data.value && s.data.value.v){ state.startDate = s.data.value.v; }
     else { await sbClient.from('settings').upsert({key:'startDate', value:{v:state.startDate}}); }
@@ -1870,6 +1884,23 @@ function sbDeleteLog(id){
 function sbSaveStart(){
   if (!sbClient) return;
   sbClient.from('settings').upsert({key:'startDate', value:{v:state.startDate}}).then(function(){});
+}
+/* one-time: kettlebell entries used to be logged in lb — convert them to kg */
+function migrateKbKg(){
+  var changed = false;
+  state.logs.forEach(function(l){
+    if (l.type!=='strength' || l.kbkg) return;
+    var touched = false;
+    (l.exercises||[]).forEach(function(e){
+      if (!KB_EX[e.name]) return;
+      if (e.weight) e.weight = Math.max(4, Math.round(e.weight/2.2046));
+      (e.setDetails||[]).forEach(function(s){ if (s.weight) s.weight = Math.max(4, Math.round(s.weight/2.2046)); });
+      touched = true;
+    });
+    l.kbkg = 1; changed = true;
+    if (touched) sbSaveLog(l);
+  });
+  if (changed) persist();
 }
 
 /* ---------- export / import ---------- */
@@ -1958,6 +1989,7 @@ document.getElementById('logDate').addEventListener('change', function(){
   if (dayLogs.length){ selectDay(dayLogs[0].day); }
   else { renderWorkout(); }
 });
+migrateKbKg();
 if (sbCfg){
   document.getElementById('sbUrl').value = sbCfg.url;
   document.getElementById('sbKey').value = sbCfg.key;
