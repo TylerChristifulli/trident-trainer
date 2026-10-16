@@ -182,7 +182,7 @@
     <h2>Program Settings</h2>
     <label>Program Start Date</label>
     <input type="date" id="startDate" onchange="setStartDate(this.value)">
-    <p class="note">Kettlebell program, Pavel-style: every training day starts with a ~10-min stair warm-up, then the bell work. Reps are FIXED (10×10 swings is 10×10 swings) — you progress by owning the bell with crisp reps and short rest, then sizing up (+4 kg on presses, +8 kg on swings). The gold marks on each exercise show the classic standards: Pavel's &ldquo;Simple&rdquo; (32 kg) for swings and get-ups, the 24 kg ROP/snatch-test bell for presses and snatches. Deloads on weeks 6 and 12. Any barbell moves you add still use the estimated-1RM engine.</p>
+    <p class="note">Bane protocol &mdash; Tom Hardy&rsquo;s reported Dark Knight Rises prep turned into a 4-day split: Day 1 Chest &amp; Delts (the armor), Day 2 Back &amp; Traps (the yoke), Day 3 Legs, Day 4 Power &amp; Core. Every day still opens with the ~10-min stair warm-up. Barbell lifts run on the estimated-1RM engine with RIR ramping 3&rarr;0 across each 6-week meso (deloads weeks 6 and 12). Hardy&rsquo;s signature was &ldquo;signalling&rdquo; &mdash; push-up volume scattered through the whole day &mdash; so hit the dead stop push-up finishers hard, and sneak extra sets whenever. Your kettlebell sessions stay in History and the calendar.</p>
   </div>
 
   <div class="card">
@@ -218,10 +218,10 @@
       <input type="date" id="logDate" style="width:auto">
     </div>
     <div class="daypick" id="dayPick">
-      <button data-day="k1" class="active">D1<br>S&amp;S</button>
-      <button data-day="k2">D2<br>Press</button>
-      <button data-day="k3">D3<br>Snatch</button>
-      <button data-day="k4">D4<br>S&amp;S+Core</button>
+      <button data-day="b1" class="active">D1<br>Chest</button>
+      <button data-day="b2">D2<br>Back</button>
+      <button data-day="b3">D3<br>Legs</button>
+      <button data-day="b4">D4<br>Power</button>
     </div>
     <div class="rirbanner" id="rirBanner"></div>
     <div class="loctoggle" id="locToggle">
@@ -366,11 +366,11 @@ function programWeek(w){
     floorsPerSession: floorBase,
     vest: vest,
     strength: [
-      {name:'One-arm swings (S&S days)', val:'10 × 10'},
-      {name:'Turkish get-ups (S&S days)', val:'10 total'},
-      {name:'Clean & press (Day 2)', val:'2 ladders × (1-2-3)'},
-      {name:'Snatches (Day 3)', val:'10 × 5'},
-      {name:'Pull-ups (per set ×3)', val: pullups+' reps'},
+      {name:'Bench press (Day 1)', val:'top set + back-offs'},
+      {name:'Deadlift (Day 2)', val:'top set + back-offs'},
+      {name:'Back squat (Day 3)', val:'top set + back-offs'},
+      {name:'Push press (Day 4)', val:'top set + back-offs'},
+      {name:'Pull-ups (Day 2)', val: pullups+' reps'},
       {name:'Dead stop push-ups finisher', val: pushups+' reps'},
       {name:'Flutter kicks 4-ct', val: flutter+' reps'}
     ]
@@ -436,7 +436,7 @@ function renderPlan(){
   h += tgt('Mesocycle', 'Meso '+mesoOf(viewWeek)+' &middot; Week '+p.mesoWeek+' of 6'+(p.deload?' — DELOAD':''));
   h += tgt('Lifting intensity', p.rir);
   h += tgt('Daily stair warm-up', '~10 min · '+p.floorsPerSession+' floors'+(p.vest?' @ '+p.vest+' lb vest':''));
-  h += tgt('Kettlebell sessions', p.strengthSessions+'×/week');
+  h += tgt('Lifting sessions', p.strengthSessions+'×/week');
   p.strength.forEach(function(s){ h += tgt(s.name, s.val); });
   document.getElementById('weekTargets').innerHTML = h;
 
@@ -451,7 +451,7 @@ function renderPlan(){
   var floorsTarget = pc.floorsPerSession*pc.stairSessions;
   document.getElementById('weekCompletion').innerHTML =
     compl('Stair warm-ups / climbs', stairDone, pc.stairSessions) +
-    compl('Kettlebell sessions', strDone, pc.strengthSessions) +
+    compl('Lifting sessions', strDone, pc.strengthSessions) +
     compl('Total floors', floorsDone, floorsTarget);
 }
 function tgt(n,v){ return '<div class="target"><span class="name">'+n+'</span><span class="val">'+v+'</span></div>'; }
@@ -464,7 +464,7 @@ function compl(n,done,total){
 }
 
 /* ---------- RP-style progressive overload engine ---------- */
-var CORE_EX = ['One-arm swings','Turkish get-up','KB clean & press','KB snatch','Goblet squat','Renegade rows','KB windmill','Farmer carry','Plank (sec)','Pull-ups','Push-ups','Dead stop push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Bench press','Barbell row','Dips','Weighted sit-ups','Russian twists','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Backpack rows'];
+var CORE_EX = ['One-arm swings','Turkish get-up','KB clean & press','KB snatch','Goblet squat','Renegade rows','KB windmill','Farmer carry','Plank (sec)','Pull-ups','Push-ups','Dead stop push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Back squat','Front squat','Bodyweight squats','Deadlift','Romanian deadlift','Walking lunges','Calf raises','Overhead press','Push press','Bench press','Incline bench press','Barbell row','Barbell shrugs','Dips','Weighted sit-ups','Russian twists','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Backpack rows'];
 
 function weekOfDate(dateStr){
   var start = new Date(state.startDate+'T00:00:00');
@@ -586,19 +586,42 @@ function getRecommendation(exName){
    Every day: 10-min stair warm-up, then the bell work. Fixed reps, crisp form,
    never to failure — progress by owning the bell, then sizing up. */
 var WORKOUT_DAYS = {
-  k1:{name:'Day 1 — Simple & Sinister', ex:[
+  b1:{name:'Day 1 — Chest & Delts (The Armor)', ex:[
+    {n:'Bench press', m:'Chest'},
+    {n:'Incline bench press', m:'Upper chest'},
+    {n:'Overhead press', m:'Shoulders'},
+    {n:'Dips', m:'Chest'},
+    {n:'Dead stop push-ups', m:'Chest'}]},
+  b2:{name:'Day 2 — Back & Traps (The Yoke)', ex:[
+    {n:'Deadlift', m:'Posterior chain'},
+    {n:'Barbell row', m:'Back'},
+    {n:'Pull-ups', m:'Back'},
+    {n:'Barbell shrugs', m:'Traps'}]},
+  b3:{name:'Day 3 — Legs (The Base)', ex:[
+    {n:'Back squat', m:'Quads'},
+    {n:'Romanian deadlift', m:'Hamstrings'},
+    {n:'Walking lunges', m:'Legs'},
+    {n:'Calf raises', m:'Calves'}]},
+  b4:{name:'Day 4 — Power & Core (The Engine)', ex:[
+    {n:'Push press', m:'Power'},
+    {n:'Weighted sit-ups', m:'Core'},
+    {n:'Hanging leg raises', m:'Core'},
+    {n:'Flutter kicks (4-ct)', m:'Core'},
+    {n:'Dead stop push-ups', m:'Chest'}]},
+  // kettlebell block — kept so the calendar can still show those sessions
+  k1:{name:'KB — Simple & Sinister', ex:[
     {n:'One-arm swings', m:'Posterior chain'},
     {n:'Turkish get-up', m:'Full body'}]},
-  k2:{name:'Day 2 — Clean & Press + PST', ex:[
+  k2:{name:'KB — Clean & Press + PST', ex:[
     {n:'KB clean & press', m:'Shoulders'},
     {n:'Pull-ups', m:'Back'},
     {n:'Dead stop push-ups', m:'Chest'}]},
-  k3:{name:'Day 3 — Snatch & Squat', ex:[
+  k3:{name:'KB — Snatch & Squat', ex:[
     {n:'KB snatch', m:'Full body'},
     {n:'Goblet squat', m:'Quads'},
     {n:'Renegade rows', m:'Back'},
     {n:'Farmer carry', m:'Grip'}]},
-  k4:{name:'Day 4 — S&S + Core', ex:[
+  k4:{name:'KB — S&S + Core', ex:[
     {n:'One-arm swings', m:'Posterior chain'},
     {n:'Turkish get-up', m:'Full body'},
     {n:'KB windmill', m:'Core'},
@@ -633,6 +656,26 @@ var KB_EX = {
 };
 /* home / hotel versions — same muscles, zero equipment (a backpack at most) */
 var HOME_DAYS = {
+  b1:{name:'Day 1 — Push (Home)', ex:[
+    {n:'Decline push-ups', m:'Chest'},
+    {n:'Pike push-ups', m:'Shoulders'},
+    {n:'Dead stop push-ups', m:'Chest'},
+    {n:'Chair dips', m:'Chest'},
+    {n:'Plank (sec)', m:'Core'}]},
+  b2:{name:'Day 2 — Pull (Home)', ex:[
+    {n:'Inverted rows (table/towel)', m:'Back'},
+    {n:'Backpack rows', m:'Back'},
+    {n:'Sit-ups', m:'Core'},
+    {n:'Flutter kicks (4-ct)', m:'Core'}]},
+  b3:{name:'Day 3 — Legs (Home)', ex:[
+    {n:'Bodyweight squats', m:'Quads'},
+    {n:'Lying leg raises', m:'Core'},
+    {n:'V-ups', m:'Core'}]},
+  b4:{name:'Day 4 — Power & Core (Home)', ex:[
+    {n:'Pike push-ups', m:'Shoulders'},
+    {n:'Backpack rows', m:'Back'},
+    {n:'Russian twists', m:'Core'},
+    {n:'Lying leg raises', m:'Core'}]},
   k1:{name:'Day 1 — Bodyweight (Home)', ex:[
     {n:'Inverted rows (table/towel)', m:'Back'},
     {n:'Decline push-ups', m:'Chest'},
@@ -675,7 +718,8 @@ var HOME_DAYS = {
 var homeMode = 'gym';
 try { homeMode = localStorage.getItem('tridentLoc') || 'gym'; } catch(e){}
 
-var DAY_LABELS = {k1:'DAY 1', k2:'DAY 2', k3:'DAY 3', k4:'DAY 4',
+var DAY_LABELS = {b1:'DAY 1', b2:'DAY 2', b3:'DAY 3', b4:'DAY 4',
+                  k1:'KB 1', k2:'KB 2', k3:'KB 3', k4:'KB 4',
                   d1:'DAY 1', s1:'DAY 2', d3:'DAY 3', s2:'DAY 4'};
 
 /* ---------- exercise form cues + demo links ---------- */
@@ -695,6 +739,10 @@ var EX_INFO = {
   'Calf raises':'Full stretch at the bottom, pause hard at the top. Slow and controlled.',
   'Overhead press':'Squeeze glutes, brace abs, press the bar to lockout directly over ears. No leg drive.',
   'Bench press':'Shoulder blades pinned back, feet planted. Bar to mid-chest, press to lockout.',
+  'Incline bench press':'Bench at ~30°, bar to the upper chest, elbows ~45°. Builds the shelf under the collarbones.',
+  'Barbell shrugs':'Heavy bar at arm\'s length, shrug straight up toward your ears, pause, control down. No rolling, no bouncing.',
+  'Push press':'Brace, slight knee dip, drive the bar overhead with the legs and punch to lockout. Power from the ground up.',
+  'Bodyweight squats':'Feet shoulder-width, sit to full depth, chest tall, drive up fast. Pump them clean and continuous.',
   'Barbell row':'Hinge to ~45°, flat back. Pull the bar to your belly, squeeze shoulder blades, no jerking.',
   'Dips':'Shoulders down away from ears, lean slightly forward. Descend to 90° elbows, press to lockout.',
   'Weighted sit-ups':'Hold a plate on your chest. Same strict form as sit-ups — controlled both directions.',
@@ -743,6 +791,10 @@ var BENCHMARKS = {
   'KB windmill':      {bell:true, avg:12, top:24, aL:'Typical man', tL:'24 kg'},
   'Renegade rows':    {bell:true, avg:12, top:24, aL:'Typical man', tL:'24 kg pair'},
   'Bench press':          {ratio:true, avg:0.75, top:1.5,  aL:'Avg lifter', tL:'Advanced'},
+  'Incline bench press':  {ratio:true, avg:0.6,  top:1.2,  aL:'Avg lifter', tL:'Advanced'},
+  'Barbell shrugs':       {ratio:true, avg:1.0,  top:2.0,  aL:'Avg lifter', tL:'Advanced'},
+  'Push press':           {ratio:true, avg:0.6,  top:1.1,  aL:'Avg lifter', tL:'Advanced'},
+  'Bodyweight squats':    {avg:25,  top:80,  aL:'Avg man', tL:'SEAL-fit'},
   'Overhead press':       {ratio:true, avg:0.5,  top:1.0,  aL:'Avg lifter', tL:'Advanced'},
   'Barbell row':          {ratio:true, avg:0.7,  top:1.25, aL:'Avg lifter', tL:'Advanced'}
 };
@@ -793,7 +845,7 @@ function benchmarkHTML(name){
 }
 
 /* ---------- body weight tracking ---------- */
-var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Dead stop push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises'];
+var BW_EX = ['Plank (sec)','Pull-ups','Push-ups','Dead stop push-ups','Sit-ups','Flutter kicks (4-ct)','Hanging leg raises','Dips','V-ups','Inverted rows (table/towel)','Decline push-ups','Pike push-ups','Chair dips','Lying leg raises','Bodyweight squats'];
 function isBW(name){ return BW_EX.indexOf(name) !== -1; }
 function currentBodyweight(){
   if (!state.bw.length) return 0;
@@ -840,7 +892,7 @@ function sbSaveBw(){
   });
 }
 function isStairsDay(d){ return d.charAt(0)==='s'; }
-var currentDay = 'k1';
+var currentDay = 'b1';
 
 /* ---------- workout view ---------- */
 function selectDay(d){
@@ -871,8 +923,8 @@ document.querySelectorAll('#locToggle button').forEach(function(x){
    Train 4 days in 3 days or in 10, the cycle just keeps rolling: d1 → s1 → d3 → s2 → d1...
    Resumes an unfinished strength session from today first. */
 function nextWorkoutDay(){
-  var order = ['k1','k2','k3','k4'];
-  var legacyNext = {d1:'k2', s1:'k3', d3:'k4', s2:'k1'};
+  var order = ['b1','b2','b3','b4'];
+  var legacyNext = {k1:'b1', k2:'b1', k3:'b1', k4:'b1', d1:'b1', s1:'b1', d3:'b1', s2:'b1'};
   var today = todayStr();
   for (var i=state.logs.length-1; i>=0; i--){
     var l = state.logs[i];
@@ -885,7 +937,7 @@ function nextWorkoutDay(){
     }
     if (last.day && legacyNext[last.day]) return legacyNext[last.day];
   }
-  return 'k1';
+  return 'b1';
 }
 
 function setRowHTML(name, wtVal, rpVal){
@@ -977,7 +1029,7 @@ function renderWorkout(){
     var day = (homeMode==='home' && HOME_DAYS[currentDay]) ? HOME_DAYS[currentDay] : WORKOUT_DAYS[currentDay];
     document.getElementById('woSub').textContent = day.name;
     var h = '';
-    if (currentDay.charAt(0)==='k'){
+    if (currentDay.charAt(0)==='b' || currentDay.charAt(0)==='k'){
       var pw = programWeek(cw);
       h += '<div class="card excard" id="warmupCard">'+
         '<span class="chip">WARM-UP</span><h3>StairMaster — 10 min</h3>'+
@@ -1351,7 +1403,16 @@ var EX_FACTS = {
   ],
   'Dead stop push-ups': [
     'Dead stop reps remove the stretch reflex — every rep is pure starting strength, the same quality a punch or a sprint start needs.',
-    'Resting the chest on the deck each rep makes half reps impossible — the most honest push-up there is.'
+    'Resting the chest on the deck each rep makes half reps impossible — the most honest push-up there is.',
+    'Tom Hardy reportedly built Bane on relentless push-up volume scattered through the day — his trainer called it signalling. These finishers are yours.'
+  ],
+  'Barbell shrugs': [
+    'Traps are the Bane silhouette — from the cowl down, that yoke is most of what you see.',
+    'Top deadlifters shrug well over double bodyweight. Grip gives out before traps do.'
+  ],
+  'Push press': [
+    'The push press lets you handle ~20-30% more than a strict press — training raw overhead power.',
+    'It is the closest barbell cousin to the KB clean & press you were running — same drive, bigger load.'
   ],
   'Bench press': [
     'The heaviest raw bench press on record is over 780 lb (Julius Maddox).',
@@ -1567,7 +1628,7 @@ function showHooyah(log){
 }
 function weekComplete(){
   var wl = logsInWeek(currentWeek());
-  return ['k1','k2','k3','k4'].every(function(d){
+  return ['b1','b2','b3','b4'].every(function(d){
     return wl.some(function(l){ return l.day===d; });
   });
 }
